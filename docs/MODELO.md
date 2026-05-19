@@ -8,7 +8,7 @@
 
 ## Índice
 
-1. [Nodo de modelo — diseño intercambiable](#1-nodo-de-modelo)
+1. [Nodo de modelo](#1-nodo-de-modelo)
 2. [Prompt template](#2-prompt-template)
 3. [Parámetros de retrieval](#3-parametros-de-retrieval)
 4. [Router de intents](#4-router-de-intents)
@@ -18,31 +18,34 @@
 
 ## 1. Nodo de modelo
 
-Diseñado para ser intercambiable sin tocar el resto del código.
-Dos variables en `app/config.py` controlan todo.
+**Provider actual: Ollama local**
+- Embeddings: `nomic-embed-text` — genera los vectores para ChromaDB
+- LLM: `phi3:mini` — genera las respuestas
+
+Ambos corren en el mismo servicio Ollama, sin costo por token, sin dependencia externa.
 
 ```python
 # app/config.py
-MODEL_PROVIDER = "deepseek"   # "deepseek" | "ollama"
-MODEL_NAME     = "deepseek-chat"  # "phi3:mini" cuando sea Ollama
+OLLAMA_HOST            = os.getenv("OLLAMA_HOST", "ollama")
+OLLAMA_PORT            = os.getenv("OLLAMA_PORT", "11434")
+OLLAMA_EMBEDDING_MODEL = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
+MODEL_NAME             = os.getenv("MODEL_NAME", "phi3:mini")
 ```
 
 ```python
-# app/rag_chain.py — el resto del código no sabe qué provider usa
-if config.MODEL_PROVIDER == "deepseek":
-    llm = ChatOpenAI(
-        base_url="https://api.deepseek.com",
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        model=config.MODEL_NAME
-    )
-elif config.MODEL_PROVIDER == "ollama":
-    llm = ChatOllama(
-        base_url=f"http://{os.getenv('OLLAMA_HOST')}:11434",
-        model=config.MODEL_NAME
-    )
-```
+# app/rag_chain.py
+from langchain_ollama import OllamaEmbeddings, ChatOllama
 
-**Para migrar a Ollama local:** cambiar las dos variables. Nada más.
+embeddings = OllamaEmbeddings(
+    model    = config.OLLAMA_EMBEDDING_MODEL,
+    base_url = f"http://{config.OLLAMA_HOST}:{config.OLLAMA_PORT}",
+)
+
+llm = ChatOllama(
+    model    = config.MODEL_NAME,
+    base_url = f"http://{config.OLLAMA_HOST}:{config.OLLAMA_PORT}",
+)
+```
 
 ---
 
@@ -51,12 +54,10 @@ elif config.MODEL_PROVIDER == "ollama":
 ### Decisión de tono
 
 **El tono lo define el prompt, no la knowledge base.**
-Los archivos en `data/` pueden estar escritos en primera o tercera persona — no importa.
-El modelo responde según lo que el prompt le indique.
-Para cambiar el tono: modificar el prompt aquí. No hay que reescribir ningún archivo de datos.
+Los archivos en `data/` pueden estar en primera o tercera persona — no importa.
+Para cambiar el tono: modificar el prompt aquí. No hay que reescribir los datos.
 
-**Tono actual:** primera persona — el modelo responde *como* Gastón, no *sobre* Gastón.
-Esto genera más conexión con reclutadores y clientes que consultan el bot.
+**Tono actual:** primera persona — el modelo responde *como* Gastón.
 
 ### Prompt activo
 
@@ -65,11 +66,10 @@ Sos Gastón Blanco, desarrollador Fullstack especializado en ML/AI.
 Respondé en primera persona, como si fueras vos hablando directamente.
 
 Usá ÚNICAMENTE la información del contexto provisto para responder.
-Si la información no está en el contexto, decí explícitamente que
-no tenés esa información — no inferras ni inventes.
-Respondé en el mismo idioma de la pregunta.
-Sé concreto. Mencioná tecnologías y métricas cuando estén disponibles en el contexto.
+Si la información no está en el contexto, decí que no tenés esa información.
 No rompas el personaje — no digas que sos una IA ni que estás leyendo un documento.
+Respondé en el mismo idioma de la pregunta.
+Sé concreto. Mencioná tecnologías y métricas cuando estén disponibles.
 
 Contexto:
 {context}
@@ -81,24 +81,10 @@ Respuesta:
 
 ### Variante — tercera persona (desactivada)
 
-Si se quiere un tono más formal o de ficha técnica, reemplazar el prompt activo por:
-
+Reemplazar la primera línea por:
 ```
 Sos un asistente que responde preguntas sobre Gastón Blanco,
 desarrollador Fullstack especializado en ML/AI.
-
-Respondé ÚNICAMENTE basándote en el contexto provisto.
-Si la información no está en el contexto, decí explícitamente
-que no tenés esa información — no inferras ni inventes.
-Respondé en el mismo idioma de la pregunta.
-Sé preciso. Citá tecnologías y métricas cuando estén disponibles.
-
-Contexto:
-{context}
-
-Pregunta: {question}
-
-Respuesta:
 ```
 
 ---
@@ -107,8 +93,8 @@ Respuesta:
 
 | Parámetro | Valor actual | Rango sugerido | Efecto |
 |---|---|---|---|
-| `k` chunks recuperados | 4 | 3–6 | Más k = más contexto, más tokens, más costo |
-| Chunk size | 500 tokens | 300–700 | Chunks grandes = más contexto por chunk |
+| `k` chunks recuperados | 4 | 3–6 | Más k = más contexto |
+| Chunk size | 500 tokens | 300–700 | Tamaño de cada fragmento |
 | Chunk overlap | 50 tokens | 20–100 | Evita cortar ideas a la mitad |
 | Similarity threshold | 0.7 | 0.6–0.85 | Filtra chunks poco relevantes |
 
@@ -125,15 +111,14 @@ Clasifica cada pregunta antes de decidir qué fuentes consultar.
 | `modelos_ml` | ChromaDB + HuggingFace | "¿qué modelos publicó?" |
 | `general` | ChromaDB | cualquier pregunta ambigua |
 
-**Implementación MVP:** clasificación por keywords en `app/router.py`.
-**Implementación futura:** LLM-based router para mayor precisión.
+**Implementación actual:** pendiente — Fase 4.
 
 ---
 
 ## 5. Puntos de ajuste
 
 - **Respuestas incompletas** → subir `k` a 5–6
-- **Respuestas con info irrelevante** → bajar `k` a 3, subir similarity threshold a 0.8
-- **Respuestas en idioma incorrecto** → agregar forzado de idioma al prompt
+- **Respuestas con info irrelevante** → bajar `k` a 3, subir similarity a 0.8
 - **Pregunta clasificada en intent equivocado** → agregar keywords en `app/router.py`
-- **Tono muy técnico** → suavizar instrucción de tono en el prompt template
+- **Tono muy técnico** → suavizar instrucción de tono en el prompt
+- **Respuestas lentas** → phi3:mini es lento en CPU — considerar tinyllama como alternativa más liviana

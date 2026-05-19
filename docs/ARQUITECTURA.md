@@ -2,7 +2,7 @@
 ## Gastón Blanco · gaston_rag
 
 > **Documento vivo.** Se actualiza durante el desarrollo.
-> Última actualización: inicio del proyecto.
+> Última actualización: Fase 2 completada — Mayo 2026
 
 ---
 
@@ -43,13 +43,13 @@ Router (clasificador de intent)
 Construcción de contexto unificado
    │
    ▼
-Nodo de modelo (DeepSeek API → futuro: Ollama local)
+Nodo de modelo (Ollama local — phi3:mini)
    │
    ▼
 Respuesta + fuentes consultadas
 ```
 
-**Estado actual:** en diseño. Ninguna fase implementada aún.
+**Estado actual:** Fase 2 completada — 87 chunks en ChromaDB, API levantada.
 
 ---
 
@@ -63,24 +63,20 @@ Respuesta + fuentes consultadas
 | Base vectorial | ChromaDB | 0.6.3 |
 | LangChain core | langchain | 0.3.22 |
 | LangChain Chroma | langchain-chroma | 0.2.2 |
-| LangChain Ollama | langchain-ollama | 0.3.0 |
-| LangChain OpenAI* | langchain-openai | 0.3.11 |
+| LangChain Ollama | langchain-ollama | 0.2.3 |
 | LangChain splitters | langchain-text-splitters | 0.3.7 |
 | Embeddings | nomic-embed-text via Ollama | — |
-| LLM MVP | DeepSeek API | deepseek-chat |
-| LLM futuro | Ollama local (Phi-3 mini) | fase 7 |
+| LLM | phi3:mini via Ollama | — |
 | Conector GitHub | PyGithub | 2.6.1 |
 | Conector HuggingFace | huggingface-hub | 0.30.2 |
 | Rate limiting | slowapi | 0.1.9 |
 | Variables de entorno | python-dotenv | 1.1.0 |
 
-*langchain-openai se usa para el nodo DeepSeek — su API es compatible con el formato OpenAI.
-
 ---
 
 ## 3. Modelo
 
-Nodo de modelo intercambiable — hoy DeepSeek, mañana Ollama local sin tocar el resto del código.
+Nodo de modelo local — Ollama corre `phi3:mini` sin dependencias externas ni costo por token.
 El prompt, los parámetros de retrieval y el router de intents se documentan en detalle en:
 
 → **`docs/MODELO.md`**
@@ -99,7 +95,7 @@ LinkedIn excluido — sus datos entran manualmente por ChromaDB.
 
 ## 5. Seguridad
 
-API keys, exposición del endpoint, datos sensibles, rate limiting y tokens externos.
+Tokens externos, exposición del endpoint, datos sensibles, rate limiting.
 
 → **`docs/SEGURIDAD.md`**
 
@@ -107,7 +103,7 @@ API keys, exposición del endpoint, datos sensibles, rate limiting y tokens exte
 
 ## 6. Infraestructura y deploy
 
-Tres contenedores Docker, dos volúmenes persistentes, red interna, budget de RAM.
+Tres contenedores Docker, dos volúmenes persistentes, red interna.
 
 → **`docs/INFRAESTRUCTURA.md`**
 
@@ -117,7 +113,6 @@ Tres contenedores Docker, dos volúmenes persistentes, red interna, budget de RA
 
 | Extensión | Prerequisito |
 |---|---|
-| Modelo local (Phi-3 mini via Ollama) | RAM disponible tras optimizar otros servicios |
 | Chat UI | Fase 6 completa |
 | Memoria de conversación con ventana deslizante | Definir estrategia de limpieza |
 | Router LLM-based | Fase 4 en producción con casos fallando |
@@ -130,12 +125,13 @@ Tres contenedores Docker, dos volúmenes persistentes, red interna, budget de RA
 
 | Fecha | Decisión | Alternativa descartada | Razón |
 |---|---|---|---|
-| Inicio | DeepSeek como LLM MVP | Ollama local | 4GB RAM no alcanza con servicios existentes |
 | Inicio | ChromaDB en contenedor separado | ChromaDB embedded en API | Datos persisten independiente del ciclo de vida de la API |
-| Inicio | nomic-embed-text local | OpenAI embeddings | Sin costo por query, privacidad, sin dependencia externa |
+| Inicio | nomic-embed-text via Ollama | APIs externas de embeddings | Sin costo, sin dependencia externa, privacidad |
 | Inicio | LinkedIn excluido | Scraping | Términos de servicio — datos van a ChromaDB manual |
 | Inicio | GitHub + HF como fuentes en tiempo real | Duplicar en ChromaDB | No duplicar datos que ya tienen API |
-| Inicio | Nodo de modelo intercambiable | Hardcodear DeepSeek | Permite migrar a local sin refactor |
 | Inicio | Todo el proyecto en Docker | Instalación directa | Aislamiento, fácil deploy y rollback |
 | Inicio | Versiones fijas en requirements y Docker | latest | Seguridad y reproducibilidad |
 | Inicio | docs/ para detalle, ARQUITECTURA.md como índice | Un solo documento largo | Fácil de mantener, cada tema actualizable por separado |
+| Fase 1 | Ollama nativo en Windows + contenedor sin límite de RAM | Imagen Docker de Ollama con límites | La imagen Docker fallaba por timeout en descarga — Ollama nativo resolvió el problema |
+| Fase 1 | phi3:mini como LLM local | DeepSeek API, Anthropic API | Sin costo por token, sin dependencia externa, corre en el servidor |
+| Fase 2 | Ingesta incremental por hash MD5 | Re-ingestar siempre | Eficiencia — solo procesa archivos que cambiaron |
