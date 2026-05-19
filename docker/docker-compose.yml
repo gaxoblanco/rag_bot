@@ -1,0 +1,103 @@
+# gaston_rag — docker-compose.yml
+# Comandos desde la raíz:
+#   Subir:  docker compose -f docker/docker-compose.yml up -d
+#   Bajar:  docker compose -f docker/docker-compose.yml down
+#   Datos:  docker compose -f docker/docker-compose.yml down -v  ← cuidado
+
+services:
+
+  # ─────────────────────────────────────────
+  # ChromaDB — base de datos vectorial
+  # ─────────────────────────────────────────
+  chroma:
+    image: chromadb/chroma:0.6.3
+    container_name: gaston-rag-chroma
+    restart: always
+    expose:
+      - "8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - gaston-rag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Ollama — embeddings + LLM local
+  # Sin límite de memoria — era lo que cortaba la descarga
+  # ─────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:0.6.8
+    container_name: gaston-rag-ollama
+    restart: always
+    expose:
+      - "11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - gaston-rag-network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # ─────────────────────────────────────────
+  # Ollama setup — descarga modelos al primer arranque
+  # ─────────────────────────────────────────
+  ollama-setup:
+    image: ollama/ollama:0.6.8
+    container_name: gaston-rag-ollama-setup
+    restart: "no"
+    entrypoint: >
+      sh -c "
+        until ollama list > /dev/null 2>&1; do
+          echo 'Esperando Ollama...' && sleep 3;
+        done &&
+        ollama pull nomic-embed-text &&
+        echo 'Modelos listos'
+      "
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - gaston-rag-network
+
+  # ─────────────────────────────────────────
+  # API — FastAPI + LangChain
+  # ─────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: gaston-rag-api
+    restart: always
+    ports:
+      - "8080:8000"
+    env_file:
+      - ../.env
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - OLLAMA_HOST=ollama
+      - OLLAMA_PORT=11434
+    depends_on:
+      chroma:
+        condition: service_healthy
+      ollama-setup:
+        condition: service_completed_successfully
+    networks:
+      - gaston-rag-network
+
+volumes:
+  chroma_data:
+  ollama_models:
+
+networks:
+  gaston-rag-network:
+    driver: bridge
