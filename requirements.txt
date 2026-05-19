@@ -1,0 +1,25 @@
+# gaston_rag — dependencias con versiones fijas
+# Última revisión: Mayo 2026
+
+# ── API ──────────────────────────────────────
+fastapi==0.115.12
+uvicorn==0.34.0
+
+# ── RAG / LangChain ──────────────────────────
+langchain==0.3.22
+langchain-chroma==0.2.2
+langchain-ollama==0.2.3
+langchain-text-splitters==0.3.7
+
+# ── Base vectorial ────────────────────────────
+chromadb==0.6.3
+
+# ── Conectores externos ───────────────────────
+PyGithub==2.6.1
+huggingface-hub==0.30.2
+
+# ── Seguridad / Rate limiting ─────────────────
+slowapi==0.1.9
+
+# ── Configuración ─────────────────────────────
+python-dotenv==1.1.0
