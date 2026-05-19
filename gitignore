@@ -1,0 +1,19 @@
+# Credenciales — nunca al repositorio
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ChromaDB — datos locales de desarrollo
+data/chroma/
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
