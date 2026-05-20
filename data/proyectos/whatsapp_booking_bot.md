@@ -2,6 +2,12 @@
 ## Categoría: proyecto_detalle
 ## Período: Noviembre 2025 — Presente (en producción con clientes reales)
 
+## Resumen
+Bot de WhatsApp en producción con clientes reales. Sistema completo de gestión
+de turnos médicos. Modelo spaCy entrenado desde cero con 99.2% de accuracy.
+Arquitectura multi-tenant con Docker. Integraciones: Twilio, Google Calendar, Redis.
+Python, Flask, SQLite. Sin LLM — modelo propio más barato y predecible.
+
 ---
 
 ## El origen

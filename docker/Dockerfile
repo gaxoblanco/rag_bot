@@ -15,7 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Código y datos
 COPY app/     ./app/
 COPY scripts/ ./scripts/
-COPY data/    ./data/
+COPY data/       ./data/
+COPY connectors/ ./connectors/
 
 EXPOSE 8000
 

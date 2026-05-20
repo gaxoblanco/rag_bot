@@ -27,7 +27,9 @@ services:
 
   # ─────────────────────────────────────────
   # Ollama — embeddings + LLM local
-  # Sin límite de memoria — era lo que cortaba la descarga
+  # Usa GPU automáticamente si está disponible
+  # Si no hay GPU, Docker ignora el bloque deploy
+  # y Ollama cae a CPU sin cambiar nada del código
   # ─────────────────────────────────────────
   ollama:
     image: ollama/ollama:0.6.8
@@ -44,9 +46,19 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all          # todas las GPUs disponibles
+              capabilities: [gpu] # si no hay GPU, se ignora → CPU
 
   # ─────────────────────────────────────────
   # Ollama setup — descarga modelos al primer arranque
+  # Modelos: nomic-embed-text (embeddings) + phi3:mini (LLM)
+  # Los modelos persisten en el volumen ollama_models —
+  # solo se descargan una vez, no en cada docker compose up
   # ─────────────────────────────────────────
   ollama-setup:
     image: ollama/ollama:0.6.8
@@ -58,6 +70,7 @@ services:
           echo 'Esperando Ollama...' && sleep 3;
         done &&
         ollama pull nomic-embed-text &&
+        ollama pull phi3:mini &&
         echo 'Modelos listos'
       "
     environment:
@@ -70,6 +83,8 @@ services:
 
   # ─────────────────────────────────────────
   # API — FastAPI + LangChain
+  # Volumen de código montado — cambios en local
+  # se reflejan sin rebuild
   # ─────────────────────────────────────────
   api:
     build:
@@ -86,6 +101,11 @@ services:
       - CHROMA_PORT=8000
       - OLLAMA_HOST=ollama
       - OLLAMA_PORT=11434
+    volumes:
+      - ../app:/app/app
+      - ../scripts:/app/scripts
+      - ../connectors:/app/connectors
+      - ../data:/app/data
     depends_on:
       chroma:
         condition: service_healthy

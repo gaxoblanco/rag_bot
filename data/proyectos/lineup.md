@@ -2,6 +2,13 @@
 ## Categoría: proyecto_detalle
 ## Período: Junio 2024
 
+## Resumen
+Plataforma que lee un póster de festival y genera automáticamente una playlist
+en Spotify con el top 10 de cada artista. OCR especializado en texto tipográfico,
+Spotify API, Python, Docker, Angular. Pipeline end-to-end sin input manual.
+Sistema de corrección para nombres de bandas — redujo errores un 80%.
+Disponible públicamente en GitHub.
+
 ---
 
 ## El origen
