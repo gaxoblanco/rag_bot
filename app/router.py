@@ -50,6 +50,35 @@ _INJECTION_KEYWORDS = [
     # Manipulación de contexto
     "nuevo contexto", "new context",
     "override", "jailbreak", "dan mode",
+    # Descarte de instrucciones — ES + EN
+    "descarta", "desecha", "descartá",
+    "olvidá todo", "olvida todo", "forget everything",
+    "deja de ser", "dejá de ser", "stop being",
+    "discard", "discard your", "discard all",
+    "drop your instructions", "ignore your instructions",
+    "don't follow", "do not follow your",
+    "throw away", "set aside your",
+    # Cambio de rol — EN extendido
+    "act as", "act like", "behave as",
+    "you are now a", "from now on you are",
+    "roleplay as", "role play as",
+    "simulate being", "simulate a",
+    "respond as if you were", "answer as if",
+    "imagine you are", "imagine you're",
+    "no longer", "you have no restrictions",
+    "unrestricted", "unfiltered", "without any rules",
+    # Autoridad falsa — ES + EN
+    "soy el dueño", "soy gaston", "soy gastón",
+    "como dueño", "como administrador", "como admin",
+    "i am the owner", "i am gaston", "i'm the owner",
+    "as the owner", "as admin", "as administrator",
+    "i created you", "i built you", "yo te hice",
+    "desactiva", "desactivá", "disable the",
+    "quita los filtros", "quitá los filtros", "remove filters",
+    "remove restrictions", "turn off filters", "disable filters",
+    "modo prueba", "modo test", "test mode",
+    "pruebas de qa", "para qa", "for qa",
+    "for testing", "for debug", "debug mode",
 ]
 
 def guardia_entrada(pregunta: str) -> bool:
@@ -85,6 +114,45 @@ _HUGGINGFACE_KEYWORDS = [
     "neural", "cnn", "deepdream", "visualización", "visualizacion",
     "publicaste", "subiste", "deployed",
 ]
+
+# ── DETECCIÓN DE PROYECTO ACTIVO ─────────────────────────────────────────────
+# Mapea keywords a proyectos conocidos.
+# Se usa para enriquecer queries ambiguas con el proyecto del turno anterior.
+
+_PROYECTOS_KEYWORDS = {
+    "that_day_london"      : ["that day", "london", "bimbo", "storybook", "drupal", "sass", "atomic design", "that day in london"],
+    "whatsapp_booking_bot" : [
+        "booking", "whatsapp", "bot", "turnos", "spacy", "twilio", "nlu", "chatbot", "reserva",
+        # Verticales de negocio — el bot es agnóstico de industria
+        "médico", "medico", "doctor", "salud", "health", "clínica", "clinica", "hospital",
+        "psicólogo", "psicologo", "terapeuta", "therapist",
+        "peluquería", "peluqueria", "barbería", "barberia", "estética", "estetica",
+        "belleza", "beauty", "spa", "masajes", "massage",
+        "fitness", "gym", "gimnasio", "entrenador", "trainer",
+        "legal", "abogado", "lawyer", "estudio jurídico",
+        "consultoría", "consultoria", "consulting",
+        "centro", "profesional", "agenda", "citas", "appointments",
+        "negocio", "business", "empresa", "servicio",
+        "solo funciona", "sirve para", "funciona para", "puedo usar",
+    ],
+    "lineup"               : ["lineup", "spotify", "festival", "playlist", "lollapalooza", "póster", "poster"],
+    "register_sponsor"     : ["register", "sponsor", "visa", "holanda", "neerlandés", "linkedin", "patrocinador"],
+    "flextech"             : ["flextech", "freelance", "landing"],
+    "interpretabilidad_ia" : ["interpretabilidad", "interpretability", "cnn", "deepdream", "neural", "activación"],
+}
+
+def detectar_proyecto(texto: str) -> str | None:
+    """
+    Detecta el proyecto mencionado en un texto (pregunta o respuesta).
+    Retorna el nombre del proyecto o None si no detecta ninguno.
+    Se usa para guardar el proyecto_activo en el historial.
+    """
+    texto_lower = texto.lower()
+    for proyecto, keywords in _PROYECTOS_KEYWORDS.items():
+        if any(kw in texto_lower for kw in keywords):
+            return proyecto
+    return None
+
 
 def clasificar_fuentes(pregunta: str) -> dict:
     """
@@ -172,6 +240,52 @@ def guardia_salida(respuesta: str) -> bool:
 
     print("[guardia_salida] Respuesta fuera de foco — bloqueando")
     return False
+
+
+# ── DETECCIÓN DE INTENT DE VISITANTE ────────────────────────────────────────
+# Discrimina entre recruiter, cliente o visitante neutro.
+# Se usa para personalizar el cierre del prompt con el CTA correcto.
+
+_RECRUITER_KEYWORDS = [
+    "trabajo", "posición", "posicion", "rol", "hiring", "hire",
+    "equipo", "team", "contrato", "contract", "disponibilidad", "available",
+    "cv", "currículum", "curriculum", "sueldo", "salario", "salary",
+    "empresa", "company", "empleado", "employee", "incorporar", "sumar al equipo",
+    "perfil profesional", "experiencia laboral", "busco un", "buscamos",
+    "oportunidad laboral", "job", "position", "candidate", "candidato",
+]
+
+_CLIENTE_KEYWORDS = [
+    "proyecto", "project", "necesito", "quiero construir", "quiero desarrollar",
+    "presupuesto", "budget", "cuánto sale", "cuanto sale", "cuánto cuesta",
+    "podés hacer", "podes hacer", "can you build", "can you develop",
+    "contratar", "hire you", "freelance", "desarrollo a medida",
+    "tengo una idea", "mi app", "mi sistema", "mi plataforma",
+    "landing page", "ecommerce", "automatizar", "bot para",
+]
+
+def detectar_intent_visitante(pregunta: str) -> str:
+    """
+    Detecta si el visitante es recruiter, cliente o neutro.
+    Retorna: 'recruiter' | 'cliente' | 'neutro'
+
+    Se usa en rag_chain.py para seleccionar el cierre del prompt
+    con el CTA correspondiente.
+    """
+    texto = pregunta.lower()
+
+    es_recruiter = any(kw in texto for kw in _RECRUITER_KEYWORDS)
+    es_cliente   = any(kw in texto for kw in _CLIENTE_KEYWORDS)
+
+    if es_recruiter and not es_cliente:
+        print("[router] Intent visitante: recruiter")
+        return "recruiter"
+    if es_cliente and not es_recruiter:
+        print("[router] Intent visitante: cliente")
+        return "cliente"
+    # Ambos o ninguno — neutro
+    print("[router] Intent visitante: neutro")
+    return "neutro"
 
 
 # ── Test desde terminal ───────────────────────────────────────────────────────
