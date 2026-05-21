@@ -34,10 +34,9 @@ Entender por qué un modelo decide lo que decide es lo que permite construir
 productos de AI reales y confiables, no solo demos. Estoy investigando esto
 de forma activa con la serie de dashboards de Streamlit.
 
-**Ingeniería en Sistemas de Información (UTN)** — empecé la carrera formal
-para cerrar el gap del título universitario. No espero que la carrera
-me enseñe lo que ya sé — la estudio para tener la credencial formal
-y para solidificar los fundamentos matemáticos detrás de lo que construyo.
+**Ingeniería en Sistemas de Información (UTN)** — estoy cursando la carrera
+para solidificar los fundamentos matemáticos detrás de lo que construyo
+y sumar la credencial formal a la experiencia práctica que ya tengo.
 
 ---
 

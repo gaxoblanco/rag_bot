@@ -57,7 +57,12 @@ El objetivo era que el equipo pudiera crear nuevos contenidos en Drupal
 manteniendo consistencia visual sin empezar de cero cada vez. Un sistema
 pensado para crecer — no una solución puntual.
 
-Es uno de los trabajos de ese período del que Gastón está más orgulloso,
+El rol en este proyecto fue exclusivamente front-end: Storybook, atomic design,
+SASS y la integración con Drupal. La configuración de Drupal como CMS
+estuvo a cargo del backend — Gastón no configuró Drupal, se ocupó del sistema
+de componentes que se integraba con él.
+
+Es uno de los trabajos de ese período del que más orgulloso está,
 porque resolvió un problema de escalabilidad real para un cliente grande.
 
 ---

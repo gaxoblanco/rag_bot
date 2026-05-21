@@ -2,12 +2,6 @@
 ## Categoría: proyecto_detalle
 ## Período: Noviembre 2025 — Presente (en producción con clientes reales)
 
-## Resumen
-Bot de WhatsApp en producción con clientes reales. Sistema completo de gestión
-de turnos médicos. Modelo spaCy entrenado desde cero con 99.2% de accuracy.
-Arquitectura multi-tenant con Docker. Integraciones: Twilio, Google Calendar, Redis.
-Python, Flask, SQLite. Sin LLM — modelo propio más barato y predecible.
-
 ---
 
 ## El origen
@@ -28,14 +22,16 @@ fue la excusa para aprender a fondo.
 
 ## Qué hace el sistema
 
-Un bot conversacional completo para gestión de turnos médicos y de salud.
-Los pacientes pueden buscar profesionales con disponibilidad en tiempo real,
-reservar, cancelar y reprogramar turnos — todo desde WhatsApp, sin descargar
-ninguna app adicional.
+Un bot conversacional completo para gestión de turnos — agnóstico de industria.
+Funciona para cualquier profesional o negocio que maneje agenda: salud, legal,
+fitness, belleza, consultoría, o cualquier vertical que necesite reservas.
+
+Los usuarios pueden buscar disponibilidad en tiempo real, reservar, cancelar
+y reprogramar turnos — todo desde WhatsApp, sin descargar ninguna app adicional.
 
 Los profesionales gestionan su agenda a través de Google Calendar: el bot
-sincroniza automáticamente, envía recordatorios a los pacientes, y maneja
-una lista de espera cuando hay cancelaciones.
+sincroniza automáticamente, envía recordatorios, maneja lista de espera
+cuando hay cancelaciones, y permite importar disponibilidad desde CSV o Excel.
 
 Está en producción con clientes reales desde noviembre de 2025.
 
@@ -142,6 +138,11 @@ El bot demostró que es posible construir un sistema de IA conversacional
 en producción sin depender de LLMs — con un modelo propio entrenado,
 más barato de operar, más predecible en su comportamiento, y sin costo variable
 por cada interacción.
+
+El sistema es generalista desde el arranque: el mismo codebase sirve cualquier
+vertical que maneje agenda. Salud fue el primer cliente, pero la arquitectura
+no asume nada del dominio — el tono, los mensajes y la lógica de negocio
+se configuran por variable de entorno sin tocar el código central.
 
 También es el proyecto donde más claramente se ve la diferencia entre
 construir un demo y construir un sistema: gestión de errores, fallbacks,
