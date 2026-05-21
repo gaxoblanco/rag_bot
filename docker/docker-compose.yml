@@ -48,13 +48,15 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # deploy.resources omitido en producción — VPS sin GPU
+    # Para desarrollo local con GPU, descomentar:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
   # ─────────────────────────────────────────
   # Ollama setup — descarga modelos al primer arranque
