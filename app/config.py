@@ -35,6 +35,14 @@ HF_TOKEN               = os.getenv("HF_TOKEN")
 HF_USERNAME            = os.getenv("HF_USERNAME", "gaxoblanco")
 
 # ── RAG — parámetros de retrieval ─────────────────────────────────────────────
-# k: chunks recuperados de ChromaDB por query
 # Ver docs/MODELO.md sección 3 para guía de ajuste
-RETRIEVAL_K            = int(os.getenv("RETRIEVAL_K", "4"))
+RETRIEVAL_K       = int(os.getenv("RETRIEVAL_K", "8"))       # chunks devueltos
+RETRIEVAL_FETCH_K = int(os.getenv("RETRIEVAL_FETCH_K", "30")) # pool MMR antes de filtrar
+RETRIEVAL_LAMBDA  = float(os.getenv("RETRIEVAL_LAMBDA", "0.6")) # 0=diversidad, 1=relevancia
+
+# ── Provider de modelo ────────────────────────────────────────────────────────
+# "ollama" | "huggingface"
+MODEL_PROVIDER      = os.getenv("MODEL_PROVIDER", "ollama")
+
+# ── HuggingFace Inference API ─────────────────────────────────────────────────
+HF_INFERENCE_MODEL  = os.getenv("HF_INFERENCE_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
