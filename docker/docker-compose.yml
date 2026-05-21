@@ -1,8 +1,8 @@
 # gaston_rag — docker-compose.yml
 # Comandos desde la raíz:
-#   Subir:  docker compose -f docker/docker-compose.yml up -d
-#   Bajar:  docker compose -f docker/docker-compose.yml down
-#   Datos:  docker compose -f docker/docker-compose.yml down -v  ← cuidado
+#   Subir:   docker compose -f docker/docker-compose.yml up -d
+#   Bajar:   docker compose -f docker/docker-compose.yml down
+#   Datos:   docker compose -f docker/docker-compose.yml down -v  ← borra volúmenes
 
 services:
 
@@ -26,10 +26,12 @@ services:
       retries: 5
 
   # ─────────────────────────────────────────
-  # Ollama — embeddings + LLM local
-  # Usa GPU automáticamente si está disponible
-  # Si no hay GPU, Docker ignora el bloque deploy
-  # y Ollama cae a CPU sin cambiar nada del código
+  # Ollama — embeddings locales
+  # Solo corre nomic-embed-text para ChromaDB.
+  # El LLM corre en HuggingFace Inference API (ver .env MODEL_PROVIDER).
+  #
+  # GPU: si hay GPU disponible Docker la usa automáticamente.
+  # Sin GPU: el bloque deploy se ignora y Ollama cae a CPU.
   # ─────────────────────────────────────────
   ollama:
     image: ollama/ollama:0.6.8
@@ -51,14 +53,16 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all          # todas las GPUs disponibles
-              capabilities: [gpu] # si no hay GPU, se ignora → CPU
+              count: all
+              capabilities: [gpu]
 
   # ─────────────────────────────────────────
   # Ollama setup — descarga modelos al primer arranque
-  # Modelos: nomic-embed-text (embeddings) + phi3:mini (LLM)
-  # Los modelos persisten en el volumen ollama_models —
-  # solo se descargan una vez, no en cada docker compose up
+  # Persisten en el volumen ollama_models — no se re-descargan.
+  #
+  # Modelos:
+  #   nomic-embed-text — embeddings para ChromaDB (siempre)
+  #   llama3.1:8b      — LLM local opcional (MODEL_PROVIDER=ollama)
   # ─────────────────────────────────────────
   ollama-setup:
     image: ollama/ollama:0.6.8
@@ -70,7 +74,6 @@ services:
           echo 'Esperando Ollama...' && sleep 3;
         done &&
         ollama pull nomic-embed-text &&
-        ollama pull phi3:mini &&
         echo 'Modelos listos'
       "
     environment:
@@ -83,8 +86,7 @@ services:
 
   # ─────────────────────────────────────────
   # API — FastAPI + LangChain
-  # Volumen de código montado — cambios en local
-  # se reflejan sin rebuild
+  # Al arrancar: re-ingesta incremental → levanta uvicorn
   # ─────────────────────────────────────────
   api:
     build:
