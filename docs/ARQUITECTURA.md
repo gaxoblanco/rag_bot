@@ -2,7 +2,7 @@
 ## Gastón Blanco · gaston_rag
 
 > **Documento vivo.** Se actualiza durante el desarrollo.
-> Última actualización: Fase 2 completada — Mayo 2026
+> Última actualización: Fase 6 completada — Mayo 2026
 
 ---
 
@@ -10,10 +10,10 @@
 
 1. [Visión general](#1-vision-general)
 2. [Stack tecnológico](#2-stack-tecnologico)
-3. [Modelo](#3-modelo) → detalle en `docs/MODELO.md`
-4. [Fuentes de datos](#4-fuentes-de-datos) → detalle en `docs/FUENTES.md`
-5. [Seguridad](#5-seguridad) → detalle en `docs/SEGURIDAD.md`
-6. [Infraestructura y deploy](#6-infraestructura-y-deploy) → detalle en `docs/INFRAESTRUCTURA.md`
+3. [Modelo](#3-modelo)
+4. [Fuentes de datos](#4-fuentes-de-datos)
+5. [Seguridad](#5-seguridad)
+6. [Infraestructura y deploy](#6-infraestructura-y-deploy)
 7. [Puntos de extensión futura](#7-puntos-de-extension-futura)
 8. [Historial de decisiones](#8-historial-de-decisiones)
 
@@ -21,35 +21,45 @@
 
 ## 1. Visión general
 
-Sistema RAG que responde preguntas sobre el perfil profesional de Gastón Blanco
-consultando tres fuentes de datos complementarias.
-
-**Principio de diseño central:**
-No duplicar datos que ya existen con API. ChromaDB guarda solo lo que no existe
-en ningún otro lado — narrativa, contexto, decisiones, orientación profesional.
+Sistema RAG que responde preguntas sobre el perfil profesional de Gastón Blanco.
+Objetivo: captar clientes y recruiters desde la landing page personal.
 
 **Flujo de una query:**
 ```
 Pregunta
    │
-   ▼
-Router (clasificador de intent)
-   │
-   ├── ChromaDB (siempre)
-   ├── GitHub API (si pregunta sobre proyectos/repos)
-   └── HuggingFace API (si pregunta sobre modelos)
+   ├── Detección de saludo → limpiar historial
+   ├── Detección de contacto puro → respuesta directa con CTA
+   ├── Detección de intent visitante → recruiter | cliente | neutro
    │
    ▼
-Construcción de contexto unificado
+Guardia de entrada (bloquea injection/jailbreak — ES + EN)
    │
    ▼
-Nodo de modelo (Ollama local — phi3:mini)
+Router de fuentes
+   ├── ChromaDB (siempre) — MMR k=8, fetch_k=30, lambda=0.6
+   ├── GitHub API (proyectos/repos)
+   └── HuggingFace API (modelos/spaces)
    │
    ▼
-Respuesta + fuentes consultadas
+Construcción de contexto separado
+   ├── context_proyecto — query enriquecida con proyecto_activo del historial
+   └── context_referencia — GitHub, HuggingFace, chunks generales
+   │
+   ▼
+LLM intercambiable (HuggingFace Inference API / Ollama)
+   │
+   ▼
+Guardia de salida (valida que respuesta sea sobre Gastón)
+   │
+   ▼
+Guardar en historial conversacional (proyecto_activo detectado)
+   │
+   ▼
+Respuesta + CTA según intent del visitante
 ```
 
-**Estado actual:** Fase 2 completada — 87 chunks en ChromaDB, API levantada.
+**Estado actual:** Fase 6 completada. Pendiente: deploy en Donweb.
 
 ---
 
@@ -64,11 +74,11 @@ Respuesta + fuentes consultadas
 | LangChain core | langchain | 0.3.22 |
 | LangChain Chroma | langchain-chroma | 0.2.2 |
 | LangChain Ollama | langchain-ollama | 0.2.3 |
-| LangChain splitters | langchain-text-splitters | 0.3.7 |
+| LangChain HuggingFace | langchain-huggingface | 0.1.2 |
+| HuggingFace Hub | huggingface-hub | 0.30.2 |
 | Embeddings | nomic-embed-text via Ollama | — |
-| LLM | phi3:mini via Ollama | — |
-| Conector GitHub | PyGithub | 2.6.1 |
-| Conector HuggingFace | huggingface-hub | 0.30.2 |
+| LLM producción | Llama-3.1-8B via HF Inference API / Novita | — |
+| LLM desarrollo | llama3.1:8b via Ollama | — |
 | Rate limiting | slowapi | 0.1.9 |
 | Variables de entorno | python-dotenv | 1.1.0 |
 
@@ -76,8 +86,9 @@ Respuesta + fuentes consultadas
 
 ## 3. Modelo
 
-Nodo de modelo local — Ollama corre `phi3:mini` sin dependencias externas ni costo por token.
-El prompt, los parámetros de retrieval y el router de intents se documentan en detalle en:
+Nodo intercambiable — `MODEL_PROVIDER` en `.env` define el provider sin cambiar código.
+Prompt con intención comercial — CTA adaptado según intent del visitante.
+Historial conversacional con detección de proyecto activo.
 
 → **`docs/MODELO.md`**
 
@@ -85,9 +96,18 @@ El prompt, los parámetros de retrieval y el router de intents se documentan en 
 
 ## 4. Fuentes de datos
 
-Tres fuentes complementarias. ChromaDB guarda la narrativa propia.
-GitHub y HuggingFace se consultan en tiempo real via API.
-LinkedIn excluido — sus datos entran manualmente por ChromaDB.
+ChromaDB guarda la narrativa propia (87+ chunks en `data/`).
+GitHub y HuggingFace se consultan en tiempo real.
+
+```
+data/
+├── decisiones/    — decisiones técnicas del proyecto
+├── experiencia/   — Flextech, That Day in London
+├── orientacion/   — objetivos profesionales
+├── perfil/        — experiencia_y_perfil, preferencias
+├── proyectos/     — Lineup, WhatsApp Booking Bot
+└── stack/         — tecnologías
+```
 
 → **`docs/FUENTES.md`**
 
@@ -95,7 +115,10 @@ LinkedIn excluido — sus datos entran manualmente por ChromaDB.
 
 ## 5. Seguridad
 
-Tokens externos, exposición del endpoint, datos sensibles, rate limiting.
+- `X-API-Key` header con `secrets.compare_digest` — evita timing attacks
+- Rate limit: 20 req/min por IP via slowapi
+- Guardia de entrada: injection/jailbreak en ES + EN
+- Guardia de salida: valida que respuesta sea sobre el perfil
 
 → **`docs/SEGURIDAD.md`**
 
@@ -103,7 +126,7 @@ Tokens externos, exposición del endpoint, datos sensibles, rate limiting.
 
 ## 6. Infraestructura y deploy
 
-Tres contenedores Docker, dos volúmenes persistentes, red interna.
+Tres contenedores Docker. Ollama solo sirve embeddings en producción.
 
 → **`docs/INFRAESTRUCTURA.md`**
 
@@ -113,11 +136,9 @@ Tres contenedores Docker, dos volúmenes persistentes, red interna.
 
 | Extensión | Prerequisito |
 |---|---|
-| Chat UI | Fase 6 completa |
-| Memoria de conversación con ventana deslizante | Definir estrategia de limpieza |
-| Router LLM-based | Fase 4 en producción con casos fallando |
-| Re-ingesta automática vía GitHub webhook | Fase 3 estable |
-| Autenticación en endpoint público | Si se expone con datos más sensibles |
+| Deploy en Donweb | Fase 6 completa ✅ |
+| Integración landing page | Deploy completo |
+| Re-ingesta automática vía webhook | Deploy estable |
 
 ---
 
@@ -125,13 +146,17 @@ Tres contenedores Docker, dos volúmenes persistentes, red interna.
 
 | Fecha | Decisión | Alternativa descartada | Razón |
 |---|---|---|---|
-| Inicio | ChromaDB en contenedor separado | ChromaDB embedded en API | Datos persisten independiente del ciclo de vida de la API |
-| Inicio | nomic-embed-text via Ollama | APIs externas de embeddings | Sin costo, sin dependencia externa, privacidad |
-| Inicio | LinkedIn excluido | Scraping | Términos de servicio — datos van a ChromaDB manual |
-| Inicio | GitHub + HF como fuentes en tiempo real | Duplicar en ChromaDB | No duplicar datos que ya tienen API |
-| Inicio | Todo el proyecto en Docker | Instalación directa | Aislamiento, fácil deploy y rollback |
-| Inicio | Versiones fijas en requirements y Docker | latest | Seguridad y reproducibilidad |
-| Inicio | docs/ para detalle, ARQUITECTURA.md como índice | Un solo documento largo | Fácil de mantener, cada tema actualizable por separado |
-| Fase 1 | Ollama nativo en Windows + contenedor sin límite de RAM | Imagen Docker de Ollama con límites | La imagen Docker fallaba por timeout en descarga — Ollama nativo resolvió el problema |
-| Fase 1 | phi3:mini como LLM local | DeepSeek API, Anthropic API | Sin costo por token, sin dependencia externa, corre en el servidor |
-| Fase 2 | Ingesta incremental por hash MD5 | Re-ingestar siempre | Eficiencia — solo procesa archivos que cambiaron |
+| Inicio | ChromaDB en contenedor separado | ChromaDB embedded | Datos persisten independiente del ciclo de vida de la API |
+| Inicio | nomic-embed-text via Ollama | APIs externas | Sin costo, sin dependencia externa |
+| Inicio | LinkedIn excluido | Scraping | Términos de servicio |
+| Inicio | GitHub + HF en tiempo real | Duplicar en ChromaDB | No duplicar datos que ya tienen API |
+| Fase 1 | Ollama nativo en Windows para desarrollo | Imagen Docker de Ollama | Timeout en descarga dentro de Docker |
+| Fase 2 | Ingesta incremental por hash MD5 | Re-ingestar siempre | Solo procesa archivos que cambiaron |
+| Fase 4 | MMR k=8, fetch_k=30, lambda=0.6 | similarity_search k=4 | that_day_london dominaba resultados |
+| Fase 5 | HuggingFace Inference API / Novita | Ollama en VPS sin GPU | VPS sin GPU — ~2s respuesta, sin costo fijo |
+| Fase 5 | InferenceClient directo | ChatHuggingFace | ChatHuggingFace descarga tokenizador de modelo gated → 403 |
+| Fase 5 | Nodo intercambiable via MODEL_PROVIDER | Provider hardcodeado | Permite cambiar entre HF y Ollama sin refactor |
+| Fase 6 | Contextos separados context_proyecto/context_referencia | Contexto único | Evita que preguntas de seguimiento mezclen proyectos |
+| Fase 6 | Historial con proyecto_activo | Solo pregunta/respuesta | Enriquece queries ambiguas con proyecto del turno anterior |
+| Fase 6 | Detección de intent visitante (recruiter/cliente/neutro) | Prompt único | CTA personalizado según audiencia — objetivo comercial |
+| Fase 6 | Respuesta directa para contacto puro | Pasar por LLM | Evita timeouts y bloqueos en preguntas sin keywords técnicas |

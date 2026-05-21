@@ -30,15 +30,15 @@
 | Transferencia | 1 TB/mes |
 
 **Servicios existentes corriendo:**
-- WhatsApp Bot (Flask) — Docker
-- spaCy ML service — Docker
+- WhatsApp Bot (Flask) — Docker — puerto 5000
+- spaCy ML service — Docker — puerto 8000
+- Redis — Docker
+
+**Puerto asignado para este proyecto:** 8080
 
 ---
 
 ## 2. Arquitectura Docker
-
-Tres contenedores coordinados por `docker-compose.yml`.
-La API es el único punto de entrada desde el exterior.
 
 ```
 internet → :8080 → gaston-rag-api
@@ -51,7 +51,10 @@ internet → :8080 → gaston-rag-api
 |---|---|---|
 | gaston-rag-api | build local | FastAPI + LangChain |
 | gaston-rag-chroma | chromadb/chroma:0.6.3 | Base vectorial |
-| gaston-rag-ollama | ollama/ollama:0.6.8 | Embeddings (+ LLM local futuro) |
+| gaston-rag-ollama | ollama/ollama:0.6.8 | Embeddings (nomic-embed-text) |
+
+**Nota producción:** Ollama solo sirve embeddings.
+El LLM corre en HuggingFace Inference API — sin carga local.
 
 ---
 
@@ -60,32 +63,30 @@ internet → :8080 → gaston-rag-api
 | Volumen | Contenedor | Qué guarda |
 |---|---|---|
 | `chroma_data` | chroma | Knowledge base vectorial |
-| `ollama_models` | ollama | Modelos descargados |
+| `ollama_models` | ollama | nomic-embed-text (~274 MB) |
 
 `docker compose down` baja los contenedores pero **no toca los volúmenes**.
-Para borrar datos: `docker compose down -v` — usar solo si se quiere empezar de cero.
+`docker compose down -v` borra todo — usar solo para empezar de cero.
 
 ---
 
 ## 4. Red interna
 
-Todos los contenedores del proyecto en `gaston-rag-network`.
-ChromaDB y Ollama no tienen puertos públicos — solo accesibles desde la API internamente.
+Todos los contenedores en `gaston-rag-network`.
+ChromaDB y Ollama sin puertos públicos — solo accesibles desde la API.
 
 ---
 
 ## 5. Budget de RAM
 
-| Servicio | RAM estimada | Límite Docker |
-|---|---|---|
-| WhatsApp Bot + spaCy (existente) | ~1.2 GB | — |
-| gaston-rag-api | ~300 MB | 512 MB |
-| gaston-rag-chroma | ~150 MB | 256 MB |
-| gaston-rag-ollama (solo embeddings) | ~400 MB | 768 MB |
-| SO + overhead | ~400 MB | — |
-| **Total estimado** | **~2.45 GB** | dentro de 4 GB |
-
-⚠️ Verificar baseline real antes del primer deploy — ver sección 7.
+| Servicio | RAM estimada |
+|---|---|
+| WhatsApp Bot + spaCy (existente) | ~1.2 GB |
+| gaston-rag-api | ~300 MB |
+| gaston-rag-chroma | ~150 MB |
+| gaston-rag-ollama (solo embeddings) | ~400 MB |
+| SO + overhead | ~400 MB |
+| **Total estimado** | **~2.45 GB** |
 
 ---
 
@@ -93,48 +94,75 @@ ChromaDB y Ollama no tienen puertos públicos — solo accesibles desde la API i
 
 ```bash
 # Levantar todo
-docker compose up -d
+docker compose -f docker/docker-compose.yml up -d
 
-# Bajar todo (los datos persisten)
-docker compose down
+# Bajar todo (datos persisten)
+docker compose -f docker/docker-compose.yml down
 
-# Bajar todo y borrar datos — CUIDADO
-docker compose down -v
+# Bajar todo y borrar datos
+docker compose -f docker/docker-compose.yml down -v
 
 # Ver logs en tiempo real
-docker compose logs -f api
-docker compose logs -f chroma
+docker compose -f docker/docker-compose.yml logs -f api
 
-# Reiniciar solo la API (sin tocar datos)
-docker compose restart api
-
-# Ver uso de recursos
-docker stats
-
-# Bajar el modelo de embeddings (primera vez)
-docker exec gaston-rag-ollama ollama pull nomic-embed-text
+# Reiniciar solo la API
+docker compose -f docker/docker-compose.yml restart api
 
 # Re-ingestar knowledge base
-docker exec gaston-rag-api python scripts/ingest.py
+docker compose -f docker/docker-compose.yml exec api python scripts/ingest.py
+
+# Verificar provider activo
+docker compose -f docker/docker-compose.yml exec api python -c \
+  "import os; from dotenv import load_dotenv; load_dotenv('/app/.env'); \
+  print('MODEL_PROVIDER:', os.getenv('MODEL_PROVIDER'))"
+
+# Chat de QA
+docker compose -f docker/docker-compose.yml exec -it api python scripts/chat.py \
+  --key TU_API_KEY --url http://localhost:8000
 ```
 
 ---
 
-## 7. Antes del primer deploy
-
-Correr en el servidor con los servicios existentes activos:
+## 7. Antes del primer deploy en Donweb
 
 ```bash
-# Ver RAM disponible real
+# Verificar RAM disponible
 free -h
 
-# Ver consumo de los servicios existentes
+# Ver consumo de servicios existentes
 docker stats --no-stream
 
 # Ver puertos ocupados
 ss -tlnp | grep LISTEN
 ```
 
-Verificar que el puerto 8080 esté libre antes de levantar la API.
-Si el RAM disponible es menor a 2 GB libres, reducir el límite de ollama
-o migrar al modelo TinyLlama 1.1B (~600MB) en lugar de nomic-embed-text.
+**Variables requeridas en `.env` de producción:**
+
+```env
+# Provider
+MODEL_PROVIDER=huggingface
+HF_INFERENCE_MODEL=meta-llama/Llama-3.1-8B-Instruct
+HF_TOKEN=hf_...
+
+# Conectores
+GITHUB_TOKEN=github_...
+GITHUB_USERNAME=gaxoblanco
+HF_USERNAME=gaxoblanco
+
+# ChromaDB
+CHROMA_HOST=chroma
+CHROMA_PORT=8000
+
+# Ollama (solo embeddings)
+OLLAMA_HOST=ollama
+OLLAMA_PORT=11434
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Seguridad
+GASTON_RAG_API_KEY=...
+
+# Retrieval (opcionales — tienen defaults)
+RETRIEVAL_K=8
+RETRIEVAL_FETCH_K=30
+RETRIEVAL_LAMBDA=0.6
+```
