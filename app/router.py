@@ -31,6 +31,50 @@ RESPUESTA_FUERA_DE_FOCO = (
     "y su perfil profesional."
 )
 
+RESPUESTA_INPUT_INVALIDO = (
+    "Tu pregunta es demasiado larga — intentá resumirla en pocas palabras. "
+    "Con una pregunta concreta te puedo responder mejor."
+)
+
+# ── 0. VALIDACIÓN DE INPUT ───────────────────────────────────────────────────
+# Corre antes de la guardia de entrada.
+# Protege contra inputs que consumen tokens o intentan saturar el sistema.
+
+MAX_CHARS      = 350  # maximo de caracteres
+MAX_WORD_LEN   = 40   # palabra individual mas larga (evita fuzzing sin espacios)
+MAX_REPETICION = 0.6  # si mas del 60% es la misma palabra, rechazar
+
+
+def validar_input(pregunta: str) -> tuple:
+    """Valida el input. Retorna (valido: bool, motivo: str)."""
+    texto    = pregunta.strip()
+    palabras = texto.split()
+
+    # 1. Longitud maxima
+    if len(texto) > MAX_CHARS:
+        print(f"[validar_input] Rechazado — longitud {len(texto)} > {MAX_CHARS}")
+        return False, "longitud_excedida"
+
+    # 2. Palabra individual demasiado larga — posible fuzzing sin espacios
+    if any(len(p) > MAX_WORD_LEN for p in palabras):
+        print("[validar_input] Rechazado — palabra demasiado larga")
+        return False, "palabra_larga"
+
+    # 3. Repeticion excesiva — "ignora ignora ignora..."
+    if len(palabras) > 4:
+        palabra_comun = max(set(palabras), key=palabras.count)
+        ratio = palabras.count(palabra_comun) / len(palabras)
+        if ratio > MAX_REPETICION:
+            print(f"[validar_input] Rechazado — repeticion ({ratio:.0%})")
+            return False, "repeticion_excesiva"
+
+    # 4. Caracteres de control
+    if any(ord(c) < 32 and c not in ('\n', '\r', '\t') for c in texto):
+        print("[validar_input] Rechazado — caracteres de control")
+        return False, "caracteres_invalidos"
+
+    return True, ""
+
 # ── 1. GUARDIA DE ENTRADA ─────────────────────────────────────────────────────
 # Detecta señales obvias de prompt injection o jailbreak.
 # Permisivo — solo corta cuando está muy seguro.

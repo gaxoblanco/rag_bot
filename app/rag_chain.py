@@ -46,7 +46,9 @@ from app.router import (
     guardia_salida,
     detectar_proyecto,
     detectar_intent_visitante,
+    validar_input,
     RESPUESTA_FUERA_DE_FOCO,
+    RESPUESTA_INPUT_INVALIDO,
 )
 from connectors.github_connector import get_github_projects, formatear_para_contexto as fmt_github
 from connectors.huggingface_connector import get_hf_all, formatear_para_contexto as fmt_hf
@@ -361,6 +363,15 @@ def responder(pregunta: str) -> dict:
             "blocked" : bool,       — True si fue bloqueado por un guardia
         }
     """
+
+    # 0. Validar input — longitud, repeticion, caracteres
+    valido, motivo = validar_input(pregunta)
+    if not valido:
+        return {
+            "answer" : RESPUESTA_INPUT_INVALIDO,
+            "sources": [],
+            "blocked": True,
+        }
 
     # 1. Detectar saludo — limpiar historial y responder directo
     _SALUDOS = ["hola", "buenas", "hey", "hi", "hello", "buen día", "buenas tardes", "buenas noches"]

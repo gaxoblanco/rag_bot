@@ -9,13 +9,17 @@ Endpoints:
 
 Seguridad:
     Header requerido: X-API-Key: <valor de GASTON_RAG_API_KEY en .env>
+    Filtros de input: longitud, repetición de chars/palabras, caracteres válidos
 
 Uso:
     uvicorn app.main:app --host 0.0.0.0 --port 8000
 """
 
 import os
+import re
 import secrets
+from collections import Counter
+
 from fastapi import FastAPI, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
@@ -50,6 +54,47 @@ def verificar_api_key(key: str = Security(api_key_header)) -> str:
 # ── Rate limiter ──────────────────────────────────────────────────────────────
 
 limiter = Limiter(key_func=get_remote_address)
+
+# ── Filtros de input ──────────────────────────────────────────────────────────
+# Detectan inputs maliciosos o abusivos antes de llegar al pipeline RAG.
+# Devuelven (es_valido, motivo) — motivo solo se usa para logs internos.
+
+MAX_CHARS         = 200   # longitud máxima del input
+MAX_CHAR_RATIO    = 0.40  # un caracter no puede superar el 40% del total
+MAX_WORD_REPEAT   = 4     # una palabra no puede repetirse más de N veces
+VALID_CHARS_REGEX = re.compile(r"^[\w\s\.,;:¿?¡!áéíóúÁÉÍÓÚüÜñÑ'\"\-\(\)@#/]+$")
+
+def _validar_input(texto: str) -> tuple[bool, str]:
+    """
+    Valida el input antes de procesarlo.
+    Retorna (True, "") si es válido o (False, motivo) si no lo es.
+    """
+    # 1. Longitud máxima
+    if len(texto) > MAX_CHARS:
+        return False, f"input demasiado largo ({len(texto)} chars, máx {MAX_CHARS})"
+
+    # 2. Repetición de caracteres — "aaaaaaaaaaa" o "!!!!!!!!!!"
+    if texto:
+        char_counts = Counter(texto.replace(" ", ""))
+        total_chars = len(texto.replace(" ", ""))
+        if total_chars > 0:
+            char_mas_comun, count = char_counts.most_common(1)[0]
+            if count / total_chars > MAX_CHAR_RATIO:
+                return False, f"repetición de caracter '{char_mas_comun}' ({count}/{total_chars})"
+
+    # 3. Repetición de palabras — "ignora ignora ignora ignora"
+    palabras = texto.lower().split()
+    if palabras:
+        palabra_counts = Counter(palabras)
+        _, max_count = palabra_counts.most_common(1)[0]
+        if max_count > MAX_WORD_REPEAT:
+            return False, f"repetición de palabra (máx {max_count} veces)"
+
+    # 4. Caracteres válidos — solo letras, números, puntuación básica
+    if not VALID_CHARS_REGEX.match(texto):
+        return False, "caracteres no permitidos en el input"
+
+    return True, ""
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
@@ -99,14 +144,28 @@ def ask(
 
     Requiere header: X-API-Key: <token>
     Rate limit: 20 requests por minuto por IP
+    Filtros: longitud máx 300 chars, sin repetición de chars/palabras, solo ASCII+español
     """
-    if not body.question or not body.question.strip():
+    pregunta = body.question.strip() if body.question else ""
+
+    # Validación básica
+    if not pregunta:
         raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía")
 
-    resultado = responder(body.question.strip())
+    # Filtros de input
+    es_valido, motivo = _validar_input(pregunta)
+    if not es_valido:
+        print(f"[input_filter] Bloqueado — {motivo}")
+        return RespuestaResponse(
+            answer  = "No entendí la pregunta. ¿Podés reformularla?",
+            sources = [],
+            blocked = True,
+        )
+
+    resultado = responder(pregunta)
 
     return RespuestaResponse(
         answer  = resultado["answer"],
         sources = resultado["sources"],
         blocked = resultado["blocked"],
-    )
+    )   
