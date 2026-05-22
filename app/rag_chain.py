@@ -42,6 +42,7 @@ from langchain.schema.output_parser import StrOutputParser
 from app import config
 from app.router import (
     guardia_entrada,
+    guardia_relevancia,
     clasificar_fuentes,
     guardia_salida,
     detectar_proyecto,
@@ -150,7 +151,7 @@ directamente a vos. No aclares que estás hablando de vos mismo.
 Si alguien pregunta si sos una IA, un bot, o una persona real, respondé que sos
 Gastón Blanco y que este es tu espacio para responder preguntas sobre tu perfil.
 No confirmes ni niegues ser una IA — simplemente redirigí al perfil.
-Al final de tu respuesta, si el contexto lo justifica, agregá esta frase textual: {cta_bloque}
+Solo si la pregunta muestra intención clara de contratar, trabajar juntos o iniciar un proyecto — NO en preguntas informativas, técnicas o de perfil — agregá al final esta frase: {cta_bloque}
 
 {historial_bloque}
 --- CONTEXTO DEL PROYECTO EN FOCO ---
@@ -373,14 +374,31 @@ def responder(pregunta: str) -> dict:
             "blocked": True,
         }
 
-    # 1. Detectar saludo — limpiar historial y responder directo
+    # 1. Detectar saludo — limpiar historial y responder directo sin LLM
     _SALUDOS = ["hola", "buenas", "hey", "hi", "hello", "buen día", "buenas tardes", "buenas noches"]
-    if any(s in pregunta.lower() for s in _SALUDOS) and len(pregunta.split()) <= 6:
+    es_saludo = any(s in pregunta.lower() for s in _SALUDOS) and len(pregunta.split()) <= 6
+    if es_saludo:
         limpiar_historial()
-        print("[historial] Saludo detectado — historial limpiado")
+        print("[historial] Saludo detectado — respuesta directa")
+        return {
+            "answer" : (
+                "Hola. Soy Gastón Blanco, desarrollador Fullstack especializado en ML/AI. "
+                "Podés preguntarme sobre mis proyectos, stack, experiencia o lo que quieras saber sobre mi perfil."
+            ),
+            "sources": [],
+            "blocked": False,
+        }
 
     # 2. Guardia de entrada
     if not guardia_entrada(pregunta):
+        return {
+            "answer" : RESPUESTA_FUERA_DE_FOCO,
+            "sources": [],
+            "blocked": True,
+        }
+
+    # 2b. Guardia de relevancia — off-topic sin keywords de perfil
+    if not guardia_relevancia(pregunta):
         return {
             "answer" : RESPUESTA_FUERA_DE_FOCO,
             "sources": [],
@@ -398,12 +416,17 @@ def responder(pregunta: str) -> dict:
     _CONTACTO_DIRECTO = [
         "podés ayudarme", "podes ayudarme", "can you help",
         "necesito ayuda", "quiero contactarte", "cómo te contacto",
+        "como te contacto", "cómo puedo contactarte", "como puedo contactarte",
+        "cómo puedo hablar", "como puedo hablar", "cómo hablo", "como hablo",
+        "cómo me comunico", "como me comunico", "cómo te escribo", "como te escribo",
         "estás disponible", "estas disponible", "available",
         "podés hacer", "podes hacer", "can you build", "can you develop",
         "tengo un proyecto", "tengo una idea", "necesito desarrollar",
         "necesito construir", "quiero desarrollar", "quiero construir",
         "cuánto cobrás", "cuanto cobras", "cuánto sale", "cuanto sale",
         "me podés ayudar", "me podes ayudar",
+        "quiero contratarte", "quiero contratar", "quiero trabajar con vos",
+        "how can i contact", "how do i contact", "how to reach",
     ]
     texto_lower = pregunta.lower()
     if any(kw in texto_lower for kw in _CONTACTO_DIRECTO):
