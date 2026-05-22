@@ -1,14 +1,14 @@
 """
 app/main.py
 -----------
-API REST del sistema RAG personal de Gastón Blanco.
+API REST del sistema RAG personal del usuario.
 
 Endpoints:
     GET  /health  — estado del sistema (sin auth)
     POST /ask     — recibe una pregunta y devuelve una respuesta (requiere API key)
 
 Seguridad:
-    Header requerido: X-API-Key: <valor de GASTON_RAG_API_KEY en .env>
+    Header requerido: X-API-Key: <valor de USER_RAG_API_KEY en .env>
     Filtros de input: longitud, repetición de chars/palabras, caracteres válidos
 
 Uso:
@@ -36,8 +36,9 @@ from app.rag_chain import responder
 load_dotenv()
 
 # ── Seguridad — API Key ───────────────────────────────────────────────────────
+# Cargamos una Key para que la API sea segura por defecto. Si no se setea, la API no funcionará (500 error) para evitar endpoints abiertos.
 
-API_KEY        = os.getenv("GASTON_RAG_API_KEY", "")
+API_KEY        = os.getenv("USER_RAG_API_KEY", "")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 def verificar_api_key(key: str = Security(api_key_header)) -> str:
@@ -52,6 +53,7 @@ def verificar_api_key(key: str = Security(api_key_header)) -> str:
     return key
 
 # ── Rate limiter ──────────────────────────────────────────────────────────────
+# Limito el uso de los tokens por IP para evitar abusos. 20 requests por minuto.
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -115,6 +117,7 @@ app.add_middleware(
 )
 
 # ── Modelos de request/response ───────────────────────────────────────────────
+# Defino modelos Pydantic para validar y documentar los datos de entrada/salida de los endpoints.
 
 class PreguntaRequest(BaseModel):
     question: str
