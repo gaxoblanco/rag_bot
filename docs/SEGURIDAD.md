@@ -3,16 +3,17 @@
 
 > Reglas de seguridad del proyecto. Actualizar si cambia la exposición del endpoint
 > o se agregan nuevas credenciales.
+> Última actualización: Mayo 2026 — deploy en producción completado.
 
 ---
 
 ## Índice
 
 1. [API keys y variables de entorno](#1-api-keys)
-2. [Exposición del endpoint](#2-exposicion-del-endpoint)
+2. [Capas de seguridad activas](#2-capas-de-seguridad)
 3. [Datos sensibles](#3-datos-sensibles)
 4. [Tokens externos](#4-tokens-externos)
-5. [Checklist antes de hacer deploy](#5-checklist)
+5. [Checklist de mantenimiento](#5-checklist)
 
 ---
 
@@ -22,38 +23,54 @@
 
 ```bash
 # .env — nunca commitear
-DEEPSEEK_API_KEY=
-GITHUB_TOKEN=
-HF_TOKEN=
+USER_RAG_API_KEY=        # API key del endpoint — requerida en X-API-Key header
+GITHUB_TOKEN=              # solo lectura de repos públicos
+HF_TOKEN=                  # HuggingFace Inference API (Novita/Llama 3.1)
 CHROMA_HOST=chroma
 CHROMA_PORT=8000
 OLLAMA_HOST=ollama
 OLLAMA_PORT=11434
-MODEL_PROVIDER=deepseek
-MODEL_NAME=deepseek-chat
+MODEL_PROVIDER=huggingface
+MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
 ```
-
-El archivo `.env.example` documenta las variables necesarias sin valores —
-ese sí va al repositorio.
 
 ---
 
-## 2. Exposición del endpoint
+## 2. Capas de seguridad activas
 
-**MVP:** endpoint sin autenticación.
-Aceptable porque el sistema solo responde con información que Gastón
-eligió poner en la knowledge base — no hay datos privados expuestos.
+El endpoint está expuesto públicamente en `https://xxxx.xxxx.com`.
+Las siguientes capas protegen el sistema en orden de ejecución:
 
-**Riesgos monitoreados:**
-
-| Riesgo | Mitigación MVP |
+### Capa de red
+| Mecanismo | Detalle |
 |---|---|
-| Abuso (muchas queries = costo DeepSeek) | Rate limiting con slowapi |
-| Prompt injection | Prompt template restringe estrictamente al contexto |
+| HTTPS (TLS) | Nginx + Let's Encrypt — tráfico encriptado entre cliente y servidor |
+| Puerto 8080 cerrado | iptables DROP desde exterior — solo 127.0.0.1 puede acceder directo |
+| Nginx reverse proxy | El contenedor de la API nunca está expuesto al exterior directamente |
 
-**Para v2 si se expone públicamente:**
-- API key simple para el endpoint
-- Rate limit por IP más estricto
+### Capa de aplicación
+| Mecanismo | Detalle |
+|---|---|
+| `X-API-Key` header | `secrets.compare_digest` — evita timing attacks |
+| Rate limit | 20 req/min por IP via slowapi |
+| Filtro de input | Longitud máx 200 chars, repetición de chars/palabras, regex chars válidos ES+EN |
+| Guardia de entrada | Injection/jailbreak en ES + EN — ~40 keywords |
+| Guardia de relevancia | Off-topic sin keywords de perfil — bloquea preguntas genéricas de internet |
+| Guardia de salida | Valida que la respuesta contenga keywords del perfil |
+
+### Flujo de una request rechazada
+```
+Request
+   ├── Sin X-API-Key → 401
+   ├── Rate limit superado → 429
+   ├── Input inválido (longitud/repetición/chars) → blocked: true
+   ├── Injection/jailbreak detectado → blocked: true
+   ├── Off-topic sin relación con perfil → blocked: true
+   └── Respuesta fuera de foco → blocked: true
+```
+
+Todas las respuestas rechazadas devuelven el mismo mensaje genérico
+para no revelar qué capa disparó el bloqueo.
 
 ---
 
@@ -76,14 +93,33 @@ eligió poner en la knowledge base — no hay datos privados expuestos.
 - Usar tokens con permisos mínimos — solo lectura de repos/modelos públicos
 - Rotar si se exponen accidentalmente
 - Nunca loguear tokens en output del servidor ni en logs de Docker
+- `HF_TOKEN` tiene acceso a Inference API — rotar si hay uso anómalo
 
 ---
 
-## 5. Checklist antes de hacer deploy
+## 5. Checklist de mantenimiento
 
-- [ ] `.env` no está en el repositorio (verificar `.gitignore`)
-- [ ] `.env.example` tiene todas las variables sin valores
-- [ ] ChromaDB y Ollama no tienen puertos expuestos al exterior en `docker-compose.yml`
-- [ ] Rate limiting activo en FastAPI
-- [ ] Tokens de GitHub y HuggingFace con permisos de solo lectura
-- [ ] No hay credenciales hardcodeadas en ningún archivo de código
+Para verificar el estado del sistema en producción:
+
+```bash
+# Estado de contenedores
+docker compose -f docker/docker-compose.yml ps
+
+# Puerto 8080 cerrado al exterior
+iptables -L INPUT -n | grep 8080
+# Debe mostrar: ACCEPT 127.0.0.1 + DROP 0.0.0.0/0
+
+# HTTPS activo
+curl https://rag.gaxoblanco.com/health
+
+# Certificado SSL — fecha de vencimiento
+certbot certificates
+
+# Renovación automática (certbot la hace solo, pero verificar)
+systemctl status snap.certbot.renew.timer
+```
+
+**Ante un incidente:**
+1. Rotar `USER_RAG_API_KEY` en `.env` y reiniciar el contenedor
+2. Si se expuso `HF_TOKEN`, rotarlo en HuggingFace → Settings → Tokens
+3. Si se expuso `GITHUB_TOKEN`, rotarlo en GitHub → Settings → Developer settings

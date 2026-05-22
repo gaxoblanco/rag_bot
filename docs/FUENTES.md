@@ -3,6 +3,7 @@
 
 > Detalle de las tres fuentes de datos del sistema.
 > Documento vivo — actualizar cuando se agreguen categorías o cambien los conectores.
+> Última actualización: Mayo 2026 — perfil/ agregado, guardia de relevancia documentada.
 
 ---
 
@@ -74,11 +75,13 @@ Manual. Cuando hay un proyecto nuevo o cambio relevante:
 data/
 ├── experiencia/
 │   ├── that_day_london.md
-│   └── proyectos_personales.md
+│   └── flextech.md
+├── perfil/
+│   ├── preferencias.md
+│   └── experiencia_y_perfil.md
 ├── proyectos/
 │   ├── whatsapp_booking_bot.md
-│   ├── lineup.md
-│   └── interpretability_series.md
+│   └── lineup.md
 ├── decisiones/
 │   └── decisiones_tecnicas.md
 ├── stack/
@@ -151,4 +154,5 @@ ChromaDB no tiene esquema rígido. Para agregar una categoría:
 2. Asignar el nuevo valor de `tipo` en el metadata del chunk
 3. Correr `scripts/ingest.py`
 4. Si la nueva categoría necesita un intent propio en el router, actualizar `app/router.py`
+5. Si los términos nuevos pueden confundirse con preguntas off-topic, agregarlos a `_PERFIL_KEYWORDS` en `guardia_relevancia` de `app/router.py`
 5. Documentar la nueva categoría en la tabla de la sección 2 de este archivo

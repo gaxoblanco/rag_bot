@@ -2,20 +2,21 @@
 ## Gastón Blanco · gaston_rag
 
 > **Documento vivo.** Se actualiza durante el desarrollo.
-> Última actualización: Fase 6 completada — Mayo 2026
+> Última actualización: Fase 6 + deploy producción — Mayo 2026
 
 ---
 
 ## Índice
 
 1. [Visión general](#1-vision-general)
-2. [Stack tecnológico](#2-stack-tecnologico)
-3. [Modelo](#3-modelo)
-4. [Fuentes de datos](#4-fuentes-de-datos)
-5. [Seguridad](#5-seguridad)
-6. [Infraestructura y deploy](#6-infraestructura-y-deploy)
-7. [Puntos de extensión futura](#7-puntos-de-extension-futura)
-8. [Historial de decisiones](#8-historial-de-decisiones)
+2. [Responsabilidad de cada archivo](#2-responsabilidad-de-cada-archivo)
+3. [Stack tecnológico](#3-stack-tecnologico)
+4. [Modelo](#4-modelo)
+5. [Fuentes de datos](#5-fuentes-de-datos)
+6. [Seguridad](#6-seguridad)
+7. [Infraestructura y deploy](#7-infraestructura-y-deploy)
+8. [Puntos de extensión futura](#8-puntos-de-extension-futura)
+9. [Historial de decisiones](#9-historial-de-decisiones)
 
 ---
 
@@ -34,6 +35,9 @@ Pregunta
    │
    ▼
 Guardia de entrada (bloquea injection/jailbreak — ES + EN)
+   │
+   ▼
+Guardia de relevancia (bloquea preguntas off-topic sin keywords de perfil)
    │
    ▼
 Router de fuentes
@@ -59,11 +63,49 @@ Guardar en historial conversacional (proyecto_activo detectado)
 Respuesta + CTA según intent del visitante
 ```
 
-**Estado actual:** Fase 6 completada. Pendiente: deploy en Donweb.
+**Estado actual:** Fase 6 completada. Deploy en producción — `https://rag.gaxoblanco.com`
 
 ---
 
-## 2. Stack tecnológico
+## 2. Responsabilidad de cada archivo
+
+Cada archivo tiene una responsabilidad clara y no se mete en la del otro.
+Cuando algo falla o querés cambiar algo, sabés exactamente dónde ir.
+
+```
+scripts/ingest.py   — Setup (se corre una vez o cuando cambian los docs)
+                      Lee los .md de data/, los chunkea, los vectoriza
+                      con Ollama y los guarda en ChromaDB.
+                      Ingesta incremental por hash MD5 — solo procesa
+                      archivos nuevos o modificados.
+
+app/main.py         — Puerta de entrada
+                      Recibe el HTTP request, valida API key,
+                      aplica filtros de input (longitud, repetición,
+                      caracteres) y llama a responder().
+
+app/rag_chain.py    — Cerebro / orquestador
+                      Coordina todo el flujo de una query:
+                      llama al router, construye el contexto,
+                      arma el prompt, llama al LLM,
+                      guarda el historial conversacional.
+
+app/router.py       — Especialista en decisiones
+                      Solo toma decisiones, no ejecuta nada.
+                      Responde: ¿es injection? ¿es off-topic?
+                      ¿qué fuentes consultar? ¿recruiter o cliente?
+
+app/config.py       — Variables de configuración
+                      Centraliza todos los parámetros del sistema.
+                      Un solo lugar para ajustar comportamiento.
+```
+
+**La regla de dependencias:** `main` llama a `rag_chain`, `rag_chain` llama a `router`.
+Nunca al revés. `router` no sabe que existe `rag_chain`.
+
+---
+
+## 3. Stack tecnológico
 
 | Componente | Tecnología | Versión fija |
 |---|---|---|
@@ -84,7 +126,7 @@ Respuesta + CTA según intent del visitante
 
 ---
 
-## 3. Modelo
+## 4. Modelo
 
 Nodo intercambiable — `MODEL_PROVIDER` en `.env` define el provider sin cambiar código.
 Prompt con intención comercial — CTA adaptado según intent del visitante.
@@ -94,7 +136,7 @@ Historial conversacional con detección de proyecto activo.
 
 ---
 
-## 4. Fuentes de datos
+## 5. Fuentes de datos
 
 ChromaDB guarda la narrativa propia (87+ chunks en `data/`).
 GitHub y HuggingFace se consultan en tiempo real.
@@ -113,7 +155,7 @@ data/
 
 ---
 
-## 5. Seguridad
+## 6. Seguridad
 
 - `X-API-Key` header con `secrets.compare_digest` — evita timing attacks
 - Rate limit: 20 req/min por IP via slowapi
@@ -124,25 +166,35 @@ data/
 
 ---
 
-## 6. Infraestructura y deploy
+## 7. Infraestructura y deploy
 
 Tres contenedores Docker. Ollama solo sirve embeddings en producción.
 
 → **`docs/INFRAESTRUCTURA.md`**
 
+**Estado producción:**
+- VPS Donweb — 4GB RAM, Ubuntu 24, `149.50.128.92`
+- Nginx reverse proxy → `localhost:8080` (puerto interno, no expuesto)
+- SSL Let's Encrypt — certificado automático via certbot snap
+- Dominio: `rag.gaxoblanco.com` → registro A apuntando al VPS
+- Landing: `gaxoblanco.com` → `chat.js` apunta a `https://rag.gaxoblanco.com`
+- Tres contenedores activos: `gaston-rag-api`, `gaston-rag-chroma`, `gaston-rag-ollama`
+
 ---
 
-## 7. Puntos de extensión futura
+## 8. Puntos de extensión futura
 
-| Extensión | Prerequisito |
+| Extensión | Estado |
 |---|---|
-| Deploy en Donweb | Fase 6 completa ✅ |
-| Integración landing page | Deploy completo |
-| Re-ingesta automática vía webhook | Deploy estable |
+| Deploy en Donweb VPS | ✅ Completado — `149.50.128.92` |
+| HTTPS con Let's Encrypt | ✅ Completado — `https://rag.gaxoblanco.com` |
+| Integración landing page | ✅ Completado — `gaxoblanco.com` |
+| Cerrar puerto 8080 con iptables | ✅ Completado — DROP desde exterior, ACCEPT solo 127.0.0.1 |
+| Re-ingesta automática vía webhook | ❌ Descartado — knowledge base local, frecuencia de cambio baja |
 
 ---
 
-## 8. Historial de decisiones
+## 9. Historial de decisiones
 
 | Fecha | Decisión | Alternativa descartada | Razón |
 |---|---|---|---|
@@ -160,3 +212,7 @@ Tres contenedores Docker. Ollama solo sirve embeddings en producción.
 | Fase 6 | Historial con proyecto_activo | Solo pregunta/respuesta | Enriquece queries ambiguas con proyecto del turno anterior |
 | Fase 6 | Detección de intent visitante (recruiter/cliente/neutro) | Prompt único | CTA personalizado según audiencia — objetivo comercial |
 | Fase 6 | Respuesta directa para contacto puro | Pasar por LLM | Evita timeouts y bloqueos en preguntas sin keywords técnicas |
+| Deploy | Nginx como reverse proxy | Exponer puerto 8080 directo | HTTPS + puerto interno no expuesto al exterior |
+| Deploy | certbot via snap | certbot apt | Versión apt desactualizada en Ubuntu 24 — conflicto de dependencias |
+| Deploy | torch CPU-only en Dockerfile | torch default | torch default descarga nvidia_cublas (423MB) innecesario en VPS sin GPU |
+| Deploy | guardia_relevancia como capa separada | Ampliar guardia_entrada | Separación de responsabilidades — injection vs off-topic son problemas distintos |
