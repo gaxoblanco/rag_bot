@@ -4,8 +4,8 @@ connectors/github_connector.py
 Obtiene repos pineados de GitHub via GraphQL API.
 No duplica datos que ya están en ChromaDB — solo trae lo que vive en GitHub.
 
-Los repos pineados son los que Gastón eligió mostrar como representativos
-de su perfil — señal explícita de relevancia.
+Traigo los repos pineados para mostrar como representativos
+— señal explícita de relevancia para el perfil.
 
 Función principal: get_github_projects(username) -> list[dict]
 """
