@@ -33,6 +33,8 @@ CHROMA_HOST       = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT       = int(os.getenv("CHROMA_PORT", "8000"))
 CHROMA_COLLECTION = "gaston_rag"
 
+# Lo usamos para conversión de texto a vectores.
+# Asegúrate de tener un modelo de embedding compatible en Ollama, como "nomic-embed-text".
 OLLAMA_HOST            = os.getenv("OLLAMA_HOST", "localhost")
 OLLAMA_PORT            = os.getenv("OLLAMA_PORT", "11434")
 OLLAMA_EMBEDDING_MODEL = os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
@@ -50,6 +52,9 @@ FOLDER_TO_TYPE = {
 }
 
 # ── Hashes ────────────────────────────────────────────────────────────────────
+# Para evitar re-ingestar archivos que no cambiaron, calculamos un hash MD5
+# de su contenido y lo guardamos en un JSON. En la próxima ejecución, comparamos
+# el hash actual con el guardado para detectar cambios.
 
 def calcular_hash(path: Path) -> str:
     return hashlib.md5(path.read_bytes()).hexdigest()
@@ -120,6 +125,8 @@ def borrar_chunks_de_archivo(collection: chromadb.Collection, nombre: str) -> No
         print(f"[chroma] Borrados {len(results['ids'])} chunks de '{nombre}'")
 
 # ── Chunking e ingesta ────────────────────────────────────────────────────────
+# Para cada archivo, leemos su contenido, lo dividimos en chunks con overlap,
+# y lo subimos a ChromaDB con su embedding y metadata.
 
 def procesar_archivo(path: Path) -> list[dict]:
     carpeta   = path.parent.name
@@ -178,6 +185,7 @@ def ingestar_archivo(
     print(f"[ok]     {path.name} → {len(chunks)} chunks cargados")
 
 # ── Verificación ──────────────────────────────────────────────────────────────
+# Para probar que todo funciona, hacemos una query de ejemplo y mostramos los resultados.
 
 def verificar_query(collection: chromadb.Collection, embeddings: OllamaEmbeddings) -> None:
     print("\n[test] Verificando con query de prueba...")
@@ -190,6 +198,12 @@ def verificar_query(collection: chromadb.Collection, embeddings: OllamaEmbedding
         print(f"  [{i+1}] {meta['tipo']} / {meta['fuente']}: {doc[:100]}...")
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+# 1 - Conecta a ChromaDB y obtiene la colección (creándola si no existe).
+# 2 - Carga el estado guardado (hashes) o inicia uno nuevo si --reset.
+# 3 - Escanea data/ y detecta archivos nuevos, modificados o eliminados.
+# 4 - Para cada archivo nuevo/modificado, lo procesa y lo ingesta en ChromaDB.
+# 5 - Para cada archivo eliminado, borra sus chunks de ChromaDB.
+# 6 - Guarda el nuevo estado (hashes) para la próxima ejecución.
 
 def main():
     parser = argparse.ArgumentParser()
