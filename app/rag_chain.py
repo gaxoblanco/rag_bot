@@ -75,7 +75,7 @@ def _proyecto_activo() -> str | None:
     """
     Retorna el proyecto más reciente del historial.
     Se usa para enriquecer queries ambiguas — si el último turno
-    habló de 'that_day_london', una pregunta corta como 'y el CSS?'
+    habló de un tema, 'that_day_london', una pregunta corta como 'y el CSS?'
     se enriquece con ese contexto antes de buscar en ChromaDB.
     """
     for entrada in reversed(_historial):
@@ -170,14 +170,23 @@ Respuesta:""")
 
 def _init_vectorstore() -> Chroma:
     """Conecta al ChromaDB y retorna el vectorstore listo para consultas."""
+    """ 1. Manda "qué proyectos tenés?" → Ollama → recibe vector
+        2. Manda ese vector → ChromaDB → "dame los 8 más similares"
+        3. ChromaDB responde con los chunks
+        4. El objeto te los devuelve como lista de Documents 
+    """
+
+    # 1 - Conectar a ChromaDB usando el cliente HTTP
     cliente = chromadb.HttpClient(
         host=config.CHROMA_HOST,
         port=config.CHROMA_PORT,
     )
+    # 2 - Configurar embeddings con OllamaEmbeddings apuntando al modelo local
     embeddings = OllamaEmbeddings(
         model=config.OLLAMA_EMBEDDING_MODEL,
         base_url=config.OLLAMA_BASE_URL,
     )
+    # 3 - Crear el vectorstore de Chroma usando el cliente y los embeddings
     return Chroma(
         client=cliente,
         collection_name=config.CHROMA_COLLECTION,
@@ -443,7 +452,7 @@ def responder(pregunta: str) -> dict:
     # 3. Router — decidir fuentes
     fuentes = clasificar_fuentes(pregunta)
 
-    # 3. Construir contexto desde todas las fuentes activas
+    # 3b. Construir contexto desde todas las fuentes activas
     ctx_proyecto, ctx_referencia, fuentes_usadas = _construir_contexto(pregunta, fuentes)
 
     if not ctx_proyecto and not ctx_referencia:
