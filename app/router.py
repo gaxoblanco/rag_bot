@@ -138,6 +138,77 @@ def guardia_entrada(pregunta: str) -> bool:
     return True
 
 
+# ── GUARDIA DE RELEVANCIA TEMÁTICA ───────────────────────────────────────────
+# Rechaza preguntas que no tienen ninguna relación con el perfil.
+# Se corre DESPUÉS de guardia_entrada y ANTES del RAG.
+# Permisiva: solo corta cuando ninguna keyword de perfil aparece
+# Y la pregunta tiene señales claras de ser off-topic.
+
+_PERFIL_KEYWORDS = [
+    # Identidad
+    "gastón", "gaston", "blanco", "gaxoblanco", "vos", "tu perfil",
+    "tu experiencia", "tu stack", "tu trabajo", "tus proyectos",
+    # Rol
+    "desarrollador", "developer", "programador", "fullstack",
+    "freelance", "disponible", "contratar", "contratas",
+    # Tecnologías del perfil
+    "python", "javascript", "typescript", "react", "angular", "docker",
+    "spacy", "langchain", "fastapi", "flask", "redis", "pytorch",
+    "huggingface", "chromadb", "ollama", "llm", "rag", "nlp", "ml",
+    "ia", "ai", "inteligencia artificial", "machine learning",
+    # Proyectos
+    "bot", "chatbot", "booking", "lineup", "spotify", "festival",
+    "visa", "sponsor", "interpretabilidad", "cnn", "neural",
+    "whatsapp", "twilio", "github",
+    # Perfil / carrera
+    "perfil", "cv", "currículum", "curriculum", "experiencia",
+    "carrera", "proyecto", "producción", "produccion",
+    "aprendiste", "estudiaste",
+    "objetivos", "orientación", "orientacion",
+    # Contacto
+    "contactar", "contratar", "agendar", "meet", "reunión", "reunion",
+    "precio", "presupuesto", "cuánto", "cuanto",
+]
+
+_OFFTOPIC_SEÑALES = [
+    # Preguntas genéricas de internet sin relación con perfil
+    "trabajar desde casa", "trabajo remoto", "remote work", "work from home",
+    "busco trabajo", "buscar trabajo", "encontrar trabajo", "consigo trabajo",
+    "cómo aprender", "como aprender", "aprender programación",
+    "qué lenguaje", "que lenguaje", "mejor lenguaje",
+    "cuál es el mejor", "cual es el mejor",
+    "tiempo libre", "productividad", "hábitos", "habitos",
+    "clima", "temperatura", "weather",
+    "receta", "cocina", "comida",
+    "película", "pelicula", "serie", "netflix",
+    "política", "politica", "economía", "economia",
+    "noticia", "noticias", "news",
+]
+
+def guardia_relevancia(pregunta: str) -> bool:
+    """
+    Retorna True si la pregunta es relevante para el perfil — dejar pasar.
+    Retorna False si claramente no tiene relación — cortar.
+
+    Lógica: si tiene señal off-topic Y ninguna keyword de perfil → bloquear.
+    Si tiene cualquier keyword de perfil → siempre dejar pasar.
+    Preguntas ambiguas (sin señal de ninguno) → dejar pasar (permisivo).
+    """
+    texto = pregunta.lower()
+
+    # Si tiene cualquier keyword de perfil — siempre válida
+    if any(kw in texto for kw in _PERFIL_KEYWORDS):
+        return True
+
+    # Si tiene señal clara de off-topic — bloquear
+    if any(kw in texto for kw in _OFFTOPIC_SEÑALES):
+        print(f"[guardia_relevancia] Bloqueado — off-topic sin keywords de perfil")
+        return False
+
+    # Ambiguo — dejar pasar (el LLM y la guardia de salida lo manejan)
+    return True
+
+
 # ── 2. ROUTER DE FUENTES ──────────────────────────────────────────────────────
 # Decide qué fuentes consultar según el contenido de la pregunta.
 # ChromaDB siempre activo. GitHub y HuggingFace se activan por keywords.
@@ -253,6 +324,10 @@ _RESPUESTA_VALIDA_KEYWORDS = [
 ]
 
 _BUENOS_MODALES = [
+    # Saludos
+    "hola", "buenas", "hey", "hi", "hello", "qué tal", "que tal",
+    "cómo estás", "como estas", "buen día", "buen dia",
+    # Agradecimientos y confirmaciones
     "gracias", "thanks", "thank you", "perfecto", "perfect",
     "genial", "ok", "okay", "entendido", "understood",
     "de nada", "claro", "por supuesto", "dale", "bueno",
@@ -265,16 +340,17 @@ def guardia_salida(respuesta: str) -> bool:
     Retorna False si la respuesta no tiene relación con Gastón — bloquear.
 
     Casos que siempre dejan pasar:
-        - Respuestas cortas de buenos modales
+        - Respuestas de buenos modales o saludos (hasta 30 palabras)
         - Respuestas que contienen al menos una keyword válida
     """
     texto = respuesta.lower().strip()
 
-    # Respuestas muy cortas — probablemente buenos modales
-    if len(texto.split()) <= 6:
+    # Respuestas de buenos modales — límite ampliado a 30 palabras
+    # porque el modelo puede responder "Hola, soy Gastón. ¿En qué te puedo ayudar?"
+    if len(texto.split()) <= 30:
         for saludo in _BUENOS_MODALES:
             if saludo in texto:
-                print("[guardia_salida] Buenas modales detectadas — dejando pasar")
+                print("[guardia_salida] Buenos modales detectados — dejando pasar")
                 return True
 
     # Verificar al menos una keyword válida
