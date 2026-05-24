@@ -64,7 +64,7 @@ limiter = Limiter(key_func=get_remote_address)
 MAX_CHARS         = 200   # longitud máxima del input
 MAX_CHAR_RATIO    = 0.40  # un caracter no puede superar el 40% del total
 MAX_WORD_REPEAT   = 4     # una palabra no puede repetirse más de N veces
-VALID_CHARS_REGEX = re.compile(r"^[\w\s\.,;:¿?¡!áéíóúÁÉÍÓÚüÜñÑ'\"\-\(\)@#/]+$")
+VALID_CHARS_REGEX = re.compile(r"^[a-zA-Z0-9_\s\.,;:¿?¡!áéíóúÁÉÍÓÚüÜñÑ'\"\-\(\)@#/]+$")
 
 def _validar_input(texto: str) -> tuple[bool, str]:
     """
@@ -79,7 +79,7 @@ def _validar_input(texto: str) -> tuple[bool, str]:
     if texto:
         char_counts = Counter(texto.replace(" ", ""))
         total_chars = len(texto.replace(" ", ""))
-        if total_chars > 0:
+        if total_chars > 5:  # mínimo para evitar falsos positivos con inputs muy cortos
             char_mas_comun, count = char_counts.most_common(1)[0]
             if count / total_chars > MAX_CHAR_RATIO:
                 return False, f"repetición de caracter '{char_mas_comun}' ({count}/{total_chars})"
@@ -171,4 +171,4 @@ def ask(
         answer  = resultado["answer"],
         sources = resultado["sources"],
         blocked = resultado["blocked"],
-    )   
+    )
