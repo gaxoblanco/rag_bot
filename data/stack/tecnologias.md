@@ -4,6 +4,19 @@
 > Solo tecnologías con contexto real de proyecto documentado.
 > Este archivo crece a medida que se agregan nuevos proyectos.
 
+Mis tecnologías principales son Python, JavaScript, TypeScript, Docker, Jupyter Notebook, React,
+Angular, FastAPI, Flask, spaCy, LangChain, ChromaDB, Redis, SQLite, MySQL.
+En ML/AI: LangChain, ChromaDB, Ollama, HuggingFace Inference API, spaCy, RAGAS.
+Front-end: React, Angular, HTML, CSS, SASS, Storybook.
+Herramientas: Docker, Git, Figma, VS Code.
+
+Tecnologías que no manejo: Java, Kotlin, Swift, C#, .NET, Ruby, Go, Rust,
+Vue, Svelte, GraphQL (cliente), Kubernetes, AWS, GCP, Azure.
+PHP lo usé en proyectos anteriores pero no es parte de mi stack actual.
+
+Preguntas frecuentes sobre mi stack: ¿qué tecnologías usás? ¿qué lenguajes manejás?
+¿cuál es tu stack? ¿con qué trabajás? ¿sabés Python? ¿usás Docker? ¿qué frameworks conocés?
+
 ---
 
 ## Python
@@ -14,6 +27,7 @@ Usado en el WhatsApp Booking Bot como lenguaje central del sistema —
 Flask, spaCy, Google Calendar integration, Redis, SQLite, APScheduler.
 También en Lineup para el pipeline completo de OCR + Spotify API.
 Y en la serie de interpretabilidad para XGBoost, SHAP, LIME y análisis de CNNs.
+Y en el rag_bot — FastAPI, LangChain, ChromaDB, HuggingFace Inference API.
 
 No es un lenguaje que aprendí en un curso y apliqué una vez —
 es la herramienta con la que construyo sistemas que corren en producción.
@@ -32,7 +46,31 @@ local funcione de una manera específica.
 Hoy Docker es parte natural de cualquier proyecto:
 el WhatsApp Bot corre en Docker con arquitectura multi-contenedor,
 con el servicio ML separado del bot para mantener cada imagen liviana.
-Lineup también se deployó con Docker.
+Lineup también se deployó con Docker. El rag_bot corre en Docker Compose
+con tres contenedores: API, ChromaDB y Ollama.
+
+---
+
+## FastAPI
+
+Framework backend del rag_bot — sistema RAG personal en producción.
+Maneja los endpoints de la API (`/ask`, `/playground`, `/health`),
+el dashboard público con Jinja2 + HTMX, y el rate limiting via slowapi.
+
+Elegido sobre Flask para el rag_bot por su tipado con Pydantic,
+validación automática de requests/responses, y documentación auto-generada.
+
+---
+
+## LangChain + ChromaDB + Ollama
+
+Stack completo del rag_bot — sistema RAG personal en producción.
+
+LangChain 0.3 como orquestador del pipeline RAG.
+ChromaDB 0.6.3 como base vectorial — corriendo en contenedor separado
+con volumen persistente para que los datos sobrevivan reinicios.
+Ollama con nomic-embed-text para embeddings locales sin costo.
+HuggingFace Inference API con Llama 3.1 8B como LLM en producción.
 
 ---
 
@@ -127,6 +165,14 @@ en un proyecto de una sola feature principal.
 
 ---
 
+## TypeScript
+
+Usado en proyectos frontend modernos. Base natural cuando se trabaja
+con Angular (que lo usa por defecto) y en proyectos React donde
+el tipado agrega valor real en equipos o codebases que crecen.
+
+---
+
 ## Storybook
 
 Uno de los trabajos más interesantes de That Day in London.
@@ -171,16 +217,6 @@ natural, no solo un entregable previo al desarrollo.
 
 ---
 
-## PHP
-
-Usado en Flextech para la lógica del servidor y configuración
-del servicio de correos de la landing page.
-
-También base del título de Codo a Codo (2023), donde el proyecto
-final fue una plataforma de venta de entradas con sistema de autenticación.
-
----
-
 ## HTML / CSS / JavaScript
 
 Base de todo el trabajo front-end desde el inicio.
@@ -207,3 +243,20 @@ eventos de conversación y estado del sistema.
 
 Elegido por simplicidad operativa en un sistema donde
 el volumen de datos no justifica la complejidad de un motor más pesado.
+
+---
+
+## MySQL
+
+Base de datos relacional usada en el proyecto final de Codo a Codo (2023) —
+plataforma de venta de entradas con sistema de autenticación.
+Es la experiencia principal en bases de datos relacionales.
+
+---
+
+## PHP
+
+Usado en Flextech para la lógica del servidor y configuración
+del servicio de correos de la landing page.
+También base del título de Codo a Codo (2023).
+No es parte del stack actual — mencionado por completitud histórica.
