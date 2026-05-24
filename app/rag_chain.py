@@ -134,6 +134,22 @@ Respondé en el mismo idioma de la pregunta.
 Sé concreto y directo. Mencioná tecnologías y métricas cuando estén disponibles.
 No uses saludos ni cierres como "Hola", "Espero que te sea útil" o similares.
 Si el usuario saluda, respondé con una sola oración breve y esperá la pregunta.
+Si el historial ya contiene una respuesta sobre un tema y la nueva pregunta pide más
+sobre lo mismo pero no hay más información en el contexto, no repitas la respuesta anterior.
+En cambio, pivoteá hacia algo relacionado que sí tengas en el contexto.
+Ejemplo: si ya contaste todo sobre Flextech y te piden más, podés mencionar que fue
+un proyecto más directo comparado con otros, y ofrecer contar sobre uno más complejo.
+Nunca uses frases que anuncien lo que vas a decir antes de decirlo.
+Prohibido: "Me gustaría destacar...", "Lo que me gustaría contarte...",
+"Voy a explicarte...", "En cuanto a tu pregunta...", "Me gustaría comenzar...",
+"Lo que destaco es...", "Para responder esto...", "En mi experiencia...".
+Arrancá directo con el hecho, el proyecto, la tecnología o el dato.
+Mal: "Mi experiencia es variada, pero lo que me gustaría destacar es Flextech."
+Mal: "Me alegra hablar sobre mi experiencia."
+Mal: "Con gusto te cuento sobre mis proyectos."
+Mal: "Claro, puedo contarte sobre..."
+Bien: "En Flextech desarrollé una landing page completa como freelance — diseño en Figma, HTML, CSS, JavaScript y PHP, de punta a punta sin equipo."
+Bien: "Empecé a programar en 2020 via Argentina Programa. El primer trabajo fue en That Day in London."
 No uses listas numeradas ni viñetas salvo que la pregunta lo requiera explícitamente.
 Respondé en el mínimo de párrafos necesarios — si una idea se puede decir en una
 oración, no la expandas. Priorizá densidad de información sobre extensión.
@@ -273,22 +289,34 @@ def _contexto_chromadb(query: str) -> tuple[str, list[str]]:
     return contexto, fuentes, chunks_raw
 
 
-def _contexto_chromadb_proyecto(proyecto: str) -> str:
+def _contexto_chromadb_otros_proyectos(pregunta: str, proyecto_activo: str) -> str:
     """
-    Busca en ChromaDB chunks específicos del proyecto activo.
-    Se usa para el bloque context_proyecto del prompt — información
-    de foco separada del contexto general de referencia.
+    Busca en ChromaDB chunks de otros proyectos distintos al proyecto activo.
+    Se usa para el context_referencia cuando hay proyecto_activo en el historial,
+    para que el LLM tenga material de otros proyectos y pueda pivotear
+    si el proyecto activo está agotado temáticamente.
     """
     vectorstore = _get_vectorstore()
-    docs        = vectorstore.max_marginal_relevance_search(
-        proyecto,
-        k=4,
-        fetch_k=15,
-        lambda_mult=0.7,
+    # Buscar sin enriquecer con el proyecto activo — query amplia sobre el perfil
+    docs = vectorstore.max_marginal_relevance_search(
+        pregunta,
+        k=6,
+        fetch_k=25,
+        lambda_mult=0.5,  # más diversidad para traer proyectos distintos
     )
     if not docs:
         return ""
-    return "\n\n".join(doc.page_content for doc in docs)
+    # Filtrar chunks del proyecto activo para forzar diversidad
+    proyecto_key = proyecto_activo.replace("_", " ").lower()
+    otros = [
+        doc for doc in docs
+        if proyecto_activo not in doc.metadata.get("fuente", "").lower()
+        and proyecto_key not in doc.page_content.lower()[:100]
+    ]
+    if not otros:
+        # Si todos son del mismo proyecto, devolver igual — algo es mejor que nada
+        otros = docs[:3]
+    return "\n\n".join(doc.page_content for doc in otros[:4])
 
 
 def _construir_contexto(pregunta: str, fuentes: dict) -> tuple[str, str, list[str]]:
@@ -333,9 +361,12 @@ def _construir_contexto(pregunta: str, fuentes: dict) -> tuple[str, str, list[st
         fuentes_usadas.append("chromadb")
         chunks_raw.extend(raw)
 
-    # ChromaDB — contexto de referencia (query original, general)
+    # ChromaDB — contexto de referencia
+    # Si hay proyecto activo, buscar chunks de OTROS proyectos para que el LLM
+    # tenga material para pivotear si el proyecto activo está agotado temáticamente.
+    # Si no hay proyecto activo, la búsqueda ya cubrió el contexto general.
     if proyecto:
-        ctx_ref_chroma = _contexto_chromadb_proyecto(pregunta)
+        ctx_ref_chroma = _contexto_chromadb_otros_proyectos(pregunta, proyecto)
         if ctx_ref_chroma:
             partes_ref.append(ctx_ref_chroma)
 
@@ -365,7 +396,7 @@ def _construir_contexto(pregunta: str, fuentes: dict) -> tuple[str, str, list[st
 
 # ── Función principal ─────────────────────────────────────────────────────────
 
-def responder(pregunta: str, include_contexts: bool = False) -> dict:
+def responder(pregunta: str, include_contexts: bool = False, include_trace: bool = False) -> dict:
     """
     Pipeline RAG completo con memoria conversacional.
 
@@ -385,6 +416,20 @@ def responder(pregunta: str, include_contexts: bool = False) -> dict:
             "sources": [],
             "blocked": True,
         }
+
+    # Trace — captura los pasos del pipeline para el dashboard
+    _trace: dict = {
+        "intent":            "—",
+        "fuentes_activadas": [],
+        "guardia_entrada":   True,
+        "guardia_relevancia": True,
+        "guardia_salida":    True,
+        "chunks_count":      0,
+        "chunks_por_fuente": {},
+        "proyecto_activo":   None,
+        "historial_turnos":  len(_historial),
+        "bloqueado_en":      None,
+    }
 
     # 1. Detectar saludo — limpiar historial y responder directo sin LLM
     # Saludos cortos ("hi", "hey") se chequean con \b para evitar substring match.
@@ -414,23 +459,34 @@ def responder(pregunta: str, include_contexts: bool = False) -> dict:
 
     # 2. Guardia de entrada
     if not guardia_entrada(pregunta):
+        _trace["guardia_entrada"]  = False
+        _trace["bloqueado_en"]     = "guardia_entrada"
         return {
             "answer" : RESPUESTA_FUERA_DE_FOCO,
             "sources": [],
             "blocked": True,
+            **({"trace": _trace} if include_trace else {}),
         }
 
     # 2b. Guardia de relevancia — off-topic sin keywords de perfil
-    if not guardia_relevancia(pregunta):
+    # Si hay historial activo (proyecto_activo o interacciones previas),
+    # la pregunta se asume relevante — el contexto conversacional establece
+    # que estamos hablando del perfil. Solo bloqueamos si no hay historial.
+    hay_historial = len(_historial) > 0
+    if not hay_historial and not guardia_relevancia(pregunta):
+        _trace["guardia_relevancia"] = False
+        _trace["bloqueado_en"]       = "guardia_relevancia"
         return {
             "answer" : RESPUESTA_FUERA_DE_FOCO,
             "sources": [],
             "blocked": True,
+            **({"trace": _trace} if include_trace else {}),
         }
 
     # 2. Detectar intent del visitante — recruiter, cliente o neutro
     intent_visitante = detectar_intent_visitante(pregunta)
     cta_bloque       = _obtener_cta(intent_visitante)
+    _trace["intent"] = intent_visitante
 
     # 2b. Preguntas de contacto puro — responder directo sin pasar por LLM
     #     "necesito un bot", "podés ayudarme?", "estás disponible?" son intenciones
@@ -468,6 +524,22 @@ def responder(pregunta: str, include_contexts: bool = False) -> dict:
 
     # 3b. Construir contexto desde todas las fuentes activas
     ctx_proyecto, ctx_referencia, fuentes_usadas, chunks_raw = _construir_contexto(pregunta, fuentes)
+    _trace["fuentes_activadas"] = fuentes_usadas
+    _trace["chunks_count"] = len(chunks_raw)
+    _trace["proyecto_activo"] = _proyecto_activo()
+    # Contar chunks por fuente desde el vectorstore
+    if chunks_raw:
+        import app.rag_chain as _rc
+        vs = _get_vectorstore()
+        # Buscar los metadatos de los chunks recuperados
+        fuentes_count: dict = {}
+        try:
+            for doc in vs.max_marginal_relevance_search(pregunta, k=8, fetch_k=30, lambda_mult=0.6):
+                f = doc.metadata.get("fuente", "desconocida")
+                fuentes_count[f] = fuentes_count.get(f, 0) + 1
+        except Exception:
+            pass
+        _trace["chunks_por_fuente"] = fuentes_count
 
     if not ctx_proyecto and not ctx_referencia:
         return {
@@ -496,20 +568,82 @@ def responder(pregunta: str, include_contexts: bool = False) -> dict:
             "cta_bloque"        : cta_bloque,
         })
     except Exception as e:
+        error_str = str(e)
         print(f"[rag_chain] Error en LLM: {e}")
+
+        # 402 — créditos agotados en HuggingFace Inference API
+        if "402" in error_str or "Payment Required" in error_str or "depleted" in error_str.lower():
+            print("[rag_chain] Créditos HuggingFace agotados — mensaje al usuario")
+            return {
+                "answer" : (
+                    "El sistema está temporalmente fuera de servicio por mantenimiento. "
+                    "Podés contactarme directamente por WhatsApp para cualquier consulta."
+                ),
+                "sources": [],
+                "blocked": False,
+            }
+
+        # 429 — rate limit superado
+        if "429" in error_str or "Too Many Requests" in error_str or "rate limit" in error_str.lower():
+            print("[rag_chain] Rate limit LLM — mensaje al usuario")
+            return {
+                "answer" : (
+                    "Hay mucha demanda en este momento. "
+                    "Intentá de nuevo en unos segundos o contactame por WhatsApp."
+                ),
+                "sources": [],
+                "blocked": False,
+            }
+
+        # Timeout u otro error de conexión
+        if "timeout" in error_str.lower() or "connection" in error_str.lower():
+            print("[rag_chain] Timeout LLM — mensaje al usuario")
+            return {
+                "answer" : (
+                    "El sistema tardó demasiado en responder. "
+                    "Intentá de nuevo en un momento."
+                ),
+                "sources": [],
+                "blocked": False,
+            }
+
+        # Error genérico — no revelar detalles internos
         return {
-            "answer" : "Hubo un error al generar la respuesta.",
+            "answer" : (
+                "Hubo un problema al procesar tu pregunta. "
+                "Podés intentar de nuevo o contactarme por WhatsApp."
+            ),
             "sources": fuentes_usadas,
             "blocked": False,
         }
 
     # 6. Guardia de salida
+    # Sin historial: exige keywords del perfil en la respuesta.
+    # Con historial: solo bloquea respuestas muy cortas sin keywords —
+    # el contexto conversacional garantiza que estamos hablando del perfil.
+    # Ejemplo válido con historial: "Tardé 3 meses en desarrollarlo."
     if not guardia_salida(respuesta):
-        return {
-            "answer" : RESPUESTA_FUERA_DE_FOCO,
-            "sources": [],
-            "blocked": True,
-        }
+        hay_historial_activo = len(_historial) > 0
+        if not hay_historial_activo:
+            _trace["guardia_salida"] = False
+            _trace["bloqueado_en"]   = "guardia_salida"
+            return {
+                "answer" : RESPUESTA_FUERA_DE_FOCO,
+                "sources": [],
+                "blocked": True,
+                **({"trace": _trace} if include_trace else {}),
+            }
+        # Con historial — solo bloquear si la respuesta es muy corta (≤5 palabras)
+        if len(respuesta.strip().split()) <= 5:
+            _trace["guardia_salida"] = False
+            _trace["bloqueado_en"]   = "guardia_salida"
+            return {
+                "answer" : RESPUESTA_FUERA_DE_FOCO,
+                "sources": [],
+                "blocked": True,
+                **({"trace": _trace} if include_trace else {}),
+            }
+        # Respuesta larga sin keywords pero con historial — dejar pasar
 
     # 7. Guardar en historial — proyecto_activo detectado en la respuesta
     proyecto_detectado = detectar_proyecto(respuesta) or detectar_proyecto(pregunta)
@@ -527,6 +661,7 @@ def responder(pregunta: str, include_contexts: bool = False) -> dict:
         "sources" : fuentes_usadas,
         "blocked" : False,
         **({"contexts": chunks_raw} if include_contexts else {}),
+        **({"trace": _trace} if include_trace else {}),
     }
 
 
