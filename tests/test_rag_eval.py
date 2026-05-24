@@ -20,10 +20,10 @@ Cada evaluacion hace llamadas reales al LLM y al LLM juez (lento).
 
 Correr:
     # Solo evaluacion RAG
-    pytest tests/test_rag_eval.py -v -s
+    docker compose -f docker/docker-compose.yml exec api pytest tests/test_rag_eval.py -v -s
 
     # Suite completa nivel 1 (excluye este archivo)
-    pytest tests/ -v --ignore=tests/test_rag_eval.py
+    docker compose -f docker/docker-compose.yml exec api pytest tests/ -v --ignore=tests/test_rag_eval.py
 
 Requisitos:
     pip install -r requirements-dev.txt
@@ -269,9 +269,10 @@ def test_resumen_dataset_completo():
     Util para calibrar thresholds en la primera corrida.
 
     Correr solo este test:
-        pytest tests/test_rag_eval.py::test_resumen_dataset_completo -v -s
+        docker compose -f docker/docker-compose.yml exec api pytest tests/test_rag_eval.py::test_resumen_dataset_completo -v -s
     """
-    muestras = []
+    muestras        = []
+    casos_evaluados = []
 
     for caso in GOLDEN_DATASET:
         limpiar_historial()
@@ -284,6 +285,7 @@ def test_resumen_dataset_completo():
             "answer":   resultado["answer"],
             "contexts": resultado["contexts"],
         })
+        casos_evaluados.append(caso)
 
     if not muestras:
         pytest.skip("Ninguna pregunta genero contexto")
@@ -302,14 +304,75 @@ def test_resumen_dataset_completo():
     print("RESUMEN — Evaluacion RAG completa")
     print("=" * 60)
     print(f"Preguntas evaluadas : {len(muestras)}/{len(GOLDEN_DATASET)}")
-    def _score(key):
+
+    def _score_val(key):
         val = resultado[key]
         if isinstance(val, list):
             vals = [v for v in val if v is not None]
-            return f"{sum(vals)/len(vals):.3f} ({len(vals)}/{len(val)} ok)" if vals else "N/A (todos timeout)"
-        return f"{val:.3f}" if val is not None else "N/A (timeout)"
+            return sum(vals)/len(vals) if vals else None
+        return val if val is not None else None
 
-    print(f"faithfulness        : {_score('faithfulness')}  (threshold: {THRESHOLD_FAITHFULNESS})")
-    print(f"answer_relevancy    : {_score('answer_relevancy')}  (threshold: {THRESHOLD_ANSWER_RELEVANCY})")
+    def _score_str(key):
+        val = _score_val(key)
+        src = resultado[key] if isinstance(resultado[key], list) else [resultado[key]]
+        ok  = sum(1 for v in src if v is not None)
+        return f"{val:.3f} ({ok}/{len(src)} ok)" if val is not None else "N/A (todos timeout)"
+
+    faith_avg = _score_val("faithfulness")
+    relev_avg = _score_val("answer_relevancy")
+
+    print(f"faithfulness        : {_score_str('faithfulness')}  (threshold: {THRESHOLD_FAITHFULNESS})")
+    print(f"answer_relevancy    : {_score_str('answer_relevancy')}  (threshold: {THRESHOLD_ANSWER_RELEVANCY})")
     print("=" * 60)
+
+    # Exportar resultados a eval_results.json para el dashboard
+    import json as _json, datetime as _dt
+    import chromadb as _chroma
+
+    try:
+        _client = _chroma.HttpClient(
+            host=os.getenv("CHROMA_HOST", "chroma"),
+            port=int(os.getenv("CHROMA_PORT", "8000"))
+        )
+        _metas = _client.get_collection("gaston_rag").get(include=["metadatas"])["metadatas"]
+        _fuentes_cnt = {}
+        for m in _metas:
+            f = m.get("fuente", "unknown")
+            _fuentes_cnt[f] = _fuentes_cnt.get(f, 0) + 1
+        fuentes_list = [{"nombre": k, "chunks": v}
+                        for k, v in sorted(_fuentes_cnt.items(), key=lambda x: -x[1])]
+        total_chunks = sum(_fuentes_cnt.values())
+    except Exception:
+        fuentes_list = []
+        total_chunks = 0
+
+    faith_list = resultado["faithfulness"] if isinstance(resultado["faithfulness"], list) else [resultado["faithfulness"]]
+    relev_list  = resultado["answer_relevancy"] if isinstance(resultado["answer_relevancy"], list) else [resultado["answer_relevancy"]]
+
+    por_pregunta = []
+    for i, caso in enumerate(casos_evaluados):
+        por_pregunta.append({
+            "id":               caso["id"],
+            "faithfulness":     round(faith_list[i], 3) if i < len(faith_list) and faith_list[i] is not None else None,
+            "answer_relevancy": round(relev_list[i], 3)  if i < len(relev_list) and relev_list[i]  is not None else None,
+        })
+
+    _export = {
+        "fecha":                _dt.date.today().isoformat(),
+        "faithfulness_avg":     round(faith_avg, 3) if faith_avg is not None else None,
+        "answer_relevancy_avg": round(relev_avg, 3) if relev_avg is not None else None,
+        "total_chunks":         total_chunks,
+        "preguntas_evaluadas":  len(muestras),
+        "preguntas_total":      len(GOLDEN_DATASET),
+        "modelo_llm":           os.getenv("HF_INFERENCE_MODEL", "meta-llama/Llama-3.1-8B-Instruct"),
+        "modelo_embeddings":    os.getenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text"),
+        "retrieval_k":          8,
+        "por_pregunta":         por_pregunta,
+        "fuentes":              fuentes_list,
+    }
+
+    _export_path = os.path.join(os.path.dirname(__file__), "..", "data", "eval_results.json")
+    with open(_export_path, "w", encoding="utf-8") as _f:
+        _json.dump(_export, _f, indent=2, ensure_ascii=False)
+    print(f"[eval] Resultados exportados → eval_results.json")
     # Sin assert — informativo para calibracion de thresholds
