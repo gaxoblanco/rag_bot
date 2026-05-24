@@ -1,7 +1,6 @@
-# Experiencia y perfil profesional
-## Gastón Blanco
+# Experiencia y perfil profesional — Gastón Blanco
 
----
+Soy Gastón Blanco, desarrollador Fullstack especializado en ML/AI. Empecé a programar en 2020 via Argentina Programa. Estudié Diseño Industrial en ORT Argentina. Trabajo como freelance y busco posiciones en relación de dependencia en startups de IA. Stack principal: Python, JavaScript, TypeScript, React, Angular, FastAPI, Docker, spaCy, LangChain, ChromaDB. Antes del desarrollo trabajaba con modelado 3D. Background en diseño industrial: criterio visual y pensamiento sistémico aplicado al código. Nivel de inglés B++. Abierto a trabajo híbrido y relocalización. Preferencia de empresa: startup → scale-up → corporación. Contame sobre vos, quién sos, background, trayectoria, presentate, experiencia, perfil: toda esa información está en este documento.
 
 ## Trayectoria
 
@@ -17,8 +16,6 @@ Antes del desarrollo trabajaba con modelado 3D — SolidWorks, Blender, ZBrush.
 Hoy esas herramientas quedaron en el pasado. El entorno de trabajo actual es
 Visual Studio Code y el lenguaje que requiera el proyecto.
 
----
-
 ## Situación actual
 
 Actualmente trabajo como freelance y estoy buscando trabajo activamente.
@@ -33,16 +30,12 @@ startup → scale-up → corporación.
 
 La industria que más me interesa es la de IA y el futuro que se viene.
 
----
-
 ## Tiempo en Holanda
 
 Viví 8 meses en Holanda con visa Working Holiday.
 Fue una combinación de trabajo, práctica de inglés y vínculos nuevos.
 Aproveché para ir a meetups de tecnología y conocer la escena tech local.
 Hice muy buenos amigos durante ese período.
-
----
 
 ## Stack y nivel
 
@@ -59,8 +52,6 @@ El WhatsApp Booking Bot fue el primer proyecto con una base de datos no relacion
 una experiencia nueva e interesante.
 
 El inglés está en nivel B++, actualmente en proceso de mejora activa.
-
----
 
 ## Lo que busco en un proyecto
 
