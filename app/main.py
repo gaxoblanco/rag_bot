@@ -4,8 +4,10 @@ app/main.py
 API REST del sistema RAG personal del usuario.
 
 Endpoints:
-    GET  /health  — estado del sistema (sin auth)
-    POST /ask     — recibe una pregunta y devuelve una respuesta (requiere API key)
+    GET  /         — dashboard público (sin auth, Jinja2 template)
+    GET  /health   — estado del sistema (sin auth)
+    POST /ask      — recibe una pregunta (requiere API key)
+    POST /playground — playground público (sin auth, rate limit 5/día por IP)
 
 Seguridad:
     Header requerido: X-API-Key: <valor de USER_RAG_API_KEY en .env>
@@ -20,9 +22,14 @@ import re
 import secrets
 from collections import Counter
 
-from fastapi import FastAPI, HTTPException, Security
+import json
+from pathlib import Path
+
+from fastapi import FastAPI, Form, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.security import APIKeyHeader
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -106,6 +113,22 @@ app = FastAPI(
     version     = "1.0.0",
 )
 
+# ── Templates y datos del dashboard ──────────────────────────────────────────
+# Jinja2 sirve el dashboard HTML. eval_results.json se carga una vez al iniciar.
+
+_TEMPLATES_DIR = Path(__file__).parent / "templates"
+templates      = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+
+_EVAL_FILE = Path(__file__).parent.parent / "data" / "eval_results.json"
+
+def _cargar_eval() -> dict:
+    """Carga los resultados de evaluación RAGAS desde el JSON cacheado."""
+    try:
+        with open(_EVAL_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -133,6 +156,169 @@ class RespuestaResponse(BaseModel):
 def health():
     """Verifica que la API está corriendo. Sin autenticación."""
     return {"status": "ok", "version": "1.0.0"}
+
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard(request: Request):
+    """
+    Dashboard público del sistema RAG.
+    Sirve el panel de control con métricas, arquitectura y playground.
+    Sin autenticación — público.
+    """
+    eval_data = _cargar_eval()
+    return templates.TemplateResponse("dashboard.html", {
+        "request":   request,
+        "eval_data": eval_data,
+    })
+
+
+@app.post("/playground", response_class=HTMLResponse)
+@limiter.limit("5/day")
+def playground(
+    request:  Request,
+    question: str = Form(...),
+):
+    """
+    Endpoint público del playground del dashboard.
+    Recibe una pregunta via form, llama a responder(), devuelve fragmento HTML.
+
+    Sin API key — público.
+    Rate limit: 5 requests por día por IP.
+    Sin historial conversacional — cada pregunta es independiente.
+    Sin contextos expuestos — los chunks no llegan al browser.
+    """
+    pregunta = question.strip() if question else ""
+
+    if not pregunta:
+        return HTMLResponse(_resultado_html(
+            pregunta="(pregunta vacía)",
+            answer="La pregunta no puede estar vacía.",
+            sources=[],
+            blocked=True,
+        ))
+
+    es_valido, motivo = _validar_input(pregunta)
+    if not es_valido:
+        print(f"[playground] Bloqueado — {motivo}")
+        return HTMLResponse(_resultado_html(
+            pregunta=pregunta,
+            answer="No entendí la pregunta. ¿Podés reformularla?",
+            sources=[],
+            blocked=True,
+        ))
+
+    from app.rag_chain import limpiar_historial
+    limpiar_historial()
+
+    resultado = responder(pregunta, include_contexts=True, include_trace=True)
+
+    return HTMLResponse(_resultado_html(
+        pregunta=pregunta,
+        answer=resultado["answer"],
+        sources=resultado["sources"],
+        blocked=resultado["blocked"],
+        contexts=resultado.get("contexts", []),
+        trace=resultado.get("trace", {}),
+    ))
+
+
+def _resultado_html(pregunta: str, answer: str, sources: list, blocked: bool, contexts: list = [], trace: dict = {}) -> str:
+    """
+    Genera el fragmento HTML que HTMX inserta en #results.
+    Diseño consistente con el dashboard.
+    """
+    badge = (
+        '<span class="badge badge-blocked">bloqueado</span>'
+        if blocked else
+        '<span class="badge badge-ok">ok</span>'
+    )
+    def _esc(t: str) -> str:
+        return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    source_tags = "".join(
+        f'<span class="source-tag">{_esc(s)}</span>' for s in sources
+    ) or '<span class="source-tag">—</span>'
+
+    # Timeline del pipeline
+    def _check(v): return "✓" if v else "✗"
+    def _col(v): return "trace-ok" if v else "trace-fail"
+
+    timeline_html = ""
+    if trace and not blocked:
+        intent       = trace.get("intent", "—")
+        fuentes      = " · ".join(trace.get("fuentes_activadas", [])) or "ninguna"
+        g_entrada    = trace.get("guardia_entrada", True)
+        g_relevancia = trace.get("guardia_relevancia", True)
+        g_salida     = trace.get("guardia_salida", True)
+        chunks_n     = trace.get("chunks_count", 0)
+        chunks_f     = trace.get("chunks_por_fuente", {})
+        proyecto     = trace.get("proyecto_activo") or "—"
+        historial_n  = trace.get("historial_turnos", 0)
+
+        chunks_detalle = " · ".join(
+            f"{f} ×{n}" for f, n in sorted(chunks_f.items(), key=lambda x: -x[1])
+        ) or "—"
+
+        bloqueado_en = trace.get("bloqueado_en")
+        timeline_html = f"""<div class="trace-timeline">
+  <div class="trace-step">
+    <span class="trace-label">intent</span>
+    <span class="trace-value">{intent}</span>
+  </div>
+  <div class="trace-step">
+    <span class="trace-label">fuentes activadas</span>
+    <span class="trace-value">{fuentes}</span>
+  </div>
+  <div class="trace-step {_col(g_entrada)}">
+    <span class="trace-label">guardia entrada</span>
+    <span class="trace-value">{_check(g_entrada)} {'pasó' if g_entrada else 'bloqueó'}</span>
+  </div>
+  <div class="trace-step {_col(g_relevancia)}">
+    <span class="trace-label">guardia relevancia</span>
+    <span class="trace-value">{_check(g_relevancia)} {'pasó' if g_relevancia else 'bloqueó'}</span>
+  </div>
+  <div class="trace-step">
+    <span class="trace-label">chunks recuperados</span>
+    <span class="trace-value">{chunks_n} — {chunks_detalle}</span>
+  </div>
+  <div class="trace-step">
+    <span class="trace-label">proyecto activo</span>
+    <span class="trace-value">{proyecto}</span>
+  </div>
+  <div class="trace-step">
+    <span class="trace-label">historial</span>
+    <span class="trace-value">{historial_n} turnos previos</span>
+  </div>
+  <div class="trace-step {_col(g_salida)}">
+    <span class="trace-label">guardia salida</span>
+    <span class="trace-value">{_check(g_salida)} {'pasó' if g_salida else 'bloqueó'}</span>
+  </div>
+</div>"""
+
+    chunk_preview = ""
+    if contexts and not blocked:
+        primer_chunk = _esc(contexts[0][:200].strip())
+        chunk_preview = f"""  <details class="chunk-preview">
+    <summary>ver chunk recuperado</summary>
+    <div class="chunk-content">{primer_chunk}…</div>
+  </details>"""
+
+    return f"""
+<div class="result-item">
+  <div class="result-header">
+    <span class="result-q">{_esc(pregunta)}</span>
+    {badge}
+  </div>
+  <div class="result-body">
+    <div class="result-answer">{_esc(answer)}</div>
+    <div class="result-sources">
+      <i class="ti ti-database" style="font-size:14px" aria-hidden="true"></i>
+      {source_tags}
+    </div>
+    {chunk_preview}
+  </div>
+</div>
+"""
 
 
 @app.post("/ask", response_model=RespuestaResponse)
@@ -171,4 +357,4 @@ def ask(
         answer  = resultado["answer"],
         sources = resultado["sources"],
         blocked = resultado["blocked"],
-    )
+    )   
