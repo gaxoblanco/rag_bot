@@ -8,6 +8,8 @@ Uso:
     python scripts/chat.py                        # apunta a localhost:8080
     python scripts/chat.py --url http://servidor:8080
     python scripts/chat.py --url http://servidor:8080 --key MI_API_KEY
+    docker compose -f docker/docker-compose.yml exec -it api python scripts/chat.py --key NXiMH3uVl15myKwG7VTPkzd4hTvWlAZUK6TZ9FTl8dw --url http://localhost:8000
+    
 
 Comandos especiales durante el chat:
     /salir    — termina la sesión
