@@ -17,6 +17,3 @@ data/chroma/
 
 # OS
 .DS_Store
-
-# Exclude all _pycache__
-*__pycache__
