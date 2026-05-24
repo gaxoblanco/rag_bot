@@ -2,6 +2,10 @@
 ## Categoría: experiencia
 ## Período: Abril — Mayo 2025
 
+Trabajé en Flextech como freelance desarrollando una landing page completa de forma independiente — sin equipo ni supervisión técnica. Cubrí todo el ciclo: diseño en Figma, desarrollo front-end con HTML, CSS, JavaScript y PHP, configuración del servicio de correos, y estimación de horas para definir el precio. Fue mi primer proyecto freelance gestionado de punta a punta de forma autónoma.
+
+Preguntas frecuentes sobre Flextech: ¿qué hiciste en Flextech? ¿trabajaste como freelance? ¿hiciste proyectos independientes? ¿tenés experiencia con Figma? ¿diseñaste landing pages?
+
 ---
 
 ## El proyecto
@@ -28,7 +32,7 @@ Manejar un freelance de punta a punta requiere más que código:
 saber cuántas horas lleva cada etapa, traducir eso a un precio justo,
 y entregar algo que el cliente pueda usar sin depender de nadie más para mantenerlo.
 
-En este proyecto Gastón gestionó esa cadena completa de forma autónoma.
+En este proyecto gestioné esa cadena completa de forma autónoma.
 
 ---
 
