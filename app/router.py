@@ -212,25 +212,20 @@ def guardia_relevancia(pregunta: str) -> bool:
     Preguntas ambiguas (sin señal de ninguno) → dejar pasar (permisivo).
 
     Keywords largas: match por substring (in).
-    Keywords cortas: match con \b (límite de palabra) via re.search
-                     para evitar falsos positivos ("ia" en "noticias").
+    Keywords cortas: match con \b (límite de palabra) via re.search.
     """
     texto = pregunta.lower()
 
-    # Keywords largas — substring match seguro
     if any(kw in texto for kw in _PERFIL_KEYWORDS):
         return True
 
-    # Keywords cortas — match con límite de palabra
     if any(re.search(r"\b" + re.escape(kw) + r"\b", texto) for kw in _PERFIL_KEYWORDS_WORD):
         return True
 
-    # Si tiene señal clara de off-topic — bloquear
     if any(kw in texto for kw in _OFFTOPIC_SEÑALES):
         print(f"[guardia_relevancia] Bloqueado — off-topic sin keywords de perfil")
         return False
 
-    # Ambiguo — dejar pasar (el LLM y la guardia de salida lo manejan)
     return True
 
 
@@ -346,6 +341,14 @@ _RESPUESTA_VALIDA_KEYWORDS = [
     "freelance", "cliente", "client",
     # Orientación
     "rag", "agentes", "agents", "utn", "ingeniería",
+    # Proyectos y empresas específicas
+    "flextech", "that day", "london", "bimbo",
+    "storybook", "drupal", "atomic design",
+    # Herramientas y contexto de experiencia
+    "figma", "landing", "landing page",
+    "holanda", "holand", "visa", "working holiday",
+    "diseño industrial", "ort", "argentina programa",
+    "codo a codo", "solidworks", "blender",
 ]
 
 _BUENOS_MODALES = [
@@ -400,7 +403,7 @@ _RECRUITER_KEYWORDS = [
     "oportunidad laboral", "job", "position", "candidate", "candidato",
 ]
 
-# "rol" matchea como substring en "desarrollar", "desarrollo" → requiere límite de palabra
+# "rol" matchea como substring en "desarrollar" → requiere límite de palabra
 _RECRUITER_KEYWORDS_WORD = ["rol"]
 
 _CLIENTE_KEYWORDS = [
@@ -428,7 +431,7 @@ def detectar_intent_visitante(pregunta: str) -> str:
         any(kw in texto for kw in _RECRUITER_KEYWORDS) or
         any(re.search(r"\b" + re.escape(kw) + r"\b", texto) for kw in _RECRUITER_KEYWORDS_WORD)
     )
-    es_cliente = any(kw in texto for kw in _CLIENTE_KEYWORDS)
+    es_cliente   = any(kw in texto for kw in _CLIENTE_KEYWORDS)
 
     if es_recruiter and not es_cliente:
         print("[router] Intent visitante: recruiter")
