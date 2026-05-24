@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG system — Gastón Blanco</title>
+<script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base:       #0A0A0F;
+  --bg-surface:    #0F0F1A;
+  --bg-card:       #13131F;
+  --accent-green:  #6EE7B7;
+  --accent-violet: #818CF8;
+  --accent-yellow: #FCD34D;
+  --accent-red:    #F87171;
+  --text-primary:  #F1F5F9;
+  --text-muted:    #B0BEC5;
+  --text-subtle:   #64748B;
+  --border:        #1E293B;
+  --font-sans:     'DM Sans', system-ui, sans-serif;
+  --font-mono:     'DM Mono', monospace;
+  --radius:        10px;
+  --radius-sm:     5px;
+  --radius-pill:   100px;
+  --transition:    0.22s ease;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+a { text-decoration: none; color: inherit; }
+button { border: none; background: none; font: inherit; color: inherit; cursor: pointer; }
+
+/* ── NAV ── */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 56px; display: flex; align-items: center;
+  background: rgba(10,10,15,0.88);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.nav__inner {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 1.5rem;
+}
+.nav__logo {
+  font-family: var(--font-mono); font-size: 0.875rem;
+  color: var(--text-primary); letter-spacing: 0.02em;
+}
+.nav__logo span { color: var(--accent-green); }
+.nav__badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--accent-green);
+  border: 1px solid rgba(110,231,183,0.2);
+  background: rgba(110,231,183,0.06);
+  padding: 3px 10px; border-radius: var(--radius-pill);
+}
+.nav__dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-green);
+  animation: pulse-green 2.5s ease-in-out infinite;
+}
+@keyframes pulse-green {
+  0%,100% { box-shadow: 0 0 0 3px rgba(110,231,183,0.15); }
+  50%      { box-shadow: 0 0 0 6px rgba(110,231,183,0.05); }
+}
+
+/* ── LAYOUT ── */
+.main {
+  max-width: 1080px; margin: 0 auto;
+  padding: 80px 1.5rem 4rem;
+}
+
+/* ── HEADER ── */
+.page-header { margin-bottom: 2.5rem; }
+.page-header h1 {
+  font-size: clamp(24px,3.5vw,36px); font-weight: 600;
+  letter-spacing: -0.03em; color: var(--text-primary);
+  margin-bottom: 0.4rem;
+}
+.page-header h1 em {
+  font-style: italic; font-weight: 300; color: var(--accent-green);
+}
+.page-header p {
+  font-family: var(--font-mono); font-size: 13px; color: var(--text-muted);
+}
+
+/* ── TABS ── */
+.tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2.5rem;
+}
+.tab {
+  padding: 10px 18px; font-size: 13px; font-weight: 500;
+  font-family: var(--font-mono); color: var(--text-muted);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color var(--transition);
+  letter-spacing: 0.02em;
+}
+.tab:hover { color: var(--text-primary); }
+.tab.active { color: var(--accent-green); border-bottom-color: var(--accent-green); }
+
+.pane { display: none; }
+.pane.active { display: block; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.card:last-child { margin-bottom: 0; }
+.card__title {
+  font-size: 13px; font-weight: 600; color: var(--text-primary); opacity: 0.7;
+  font-family: var(--font-mono); letter-spacing: 0.05em;
+  text-transform: uppercase; margin-bottom: 1.25rem;
+}
+
+/* ── METRICS ROW ── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+.metric {
+  background: var(--bg-card);
+  padding: 1.25rem 1.5rem;
+}
+.metric__label {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle); letter-spacing: 0.08em;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.metric__value {
+  font-size: 28px; font-weight: 400;
+  letter-spacing: -0.03em; color: var(--text-primary);
+  line-height: 1;
+}
+.metric__value.pass { color: var(--accent-green); }
+.metric__value.warn { color: var(--accent-yellow); }
+.metric__hint {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle); margin-top: 4px;
+}
+
+/* ── TWO COL ── */
+.two-col {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* ── SCORE BARS ── */
+.score-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 10px;
+}
+.score-row:last-of-type { margin-bottom: 0; }
+.score-label {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle); width: 140px; flex-shrink: 0;
+}
+.score-bar-wrap {
+  flex: 1; height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px; overflow: hidden;
+}
+.score-bar { height: 100%; border-radius: 2px; }
+.bar-pass { background: var(--accent-green); }
+.bar-warn { background: var(--accent-yellow); }
+.score-val {
+  font-family: var(--font-mono); font-size: 12px;
+  font-weight: 400; width: 34px; text-align: right;
+}
+.score-val.pass { color: var(--accent-green); }
+.score-val.warn { color: var(--accent-yellow); }
+.score-note {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle);
+  border-top: 1px solid var(--border);
+  padding-top: 10px; margin-top: 8px;
+}
+
+/* ── SOURCE LIST ── */
+.source-list { list-style: none; }
+.source-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(30,41,59,0.5);
+  font-size: 13px;
+}
+.source-item:last-child { border-bottom: none; }
+.source-name {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-primary);
+}
+.chunk-n {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  padding: 2px 8px; border-radius: var(--radius-sm);
+}
+
+/* ── ARCH ── */
+.arch-step {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(30,41,59,0.5);
+}
+.arch-step:last-child { border-bottom: none; }
+.arch-icon {
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 15px;
+}
+.ai-default { background: rgba(255,255,255,0.04); color: var(--text-subtle); }
+.ai-green   { background: rgba(110,231,183,0.1);  color: var(--accent-green); }
+.ai-violet  { background: rgba(129,140,248,0.1);  color: var(--accent-violet); }
+.ai-yellow  { background: rgba(252,211,77,0.1);   color: var(--accent-yellow); }
+.arch-name {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.arch-desc {
+  font-size: 13px; color: var(--text-primary); opacity: 0.75; margin-top: 2px;
+  line-height: 1.5;
+}
+.arch-desc code {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--accent-violet);
+  background: rgba(129,140,248,0.08);
+  padding: 1px 5px; border-radius: 3px;
+}
+
+/* ── STACK CHIPS ── */
+.stack-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+}
+.stack-group__label {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle); letter-spacing: 0.08em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.stack-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.stack-chip {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  padding: 3px 9px; border-radius: var(--radius-sm);
+}
+
+/* ── PLAYGROUND ── */
+.counter-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.counter-label {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-subtle);
+}
+.counter-pills { display: flex; gap: 5px; }
+.pill {
+  width: 28px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+  transition: background var(--transition);
+}
+.pill.used { background: var(--accent-green); }
+
+.input-wrap {
+  display: flex; gap: 8px; margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  padding: 4px 4px 4px 14px;
+  transition: border-color var(--transition);
+}
+.input-wrap:focus-within { border-color: rgba(110,231,183,0.35); }
+.input-wrap input {
+  flex: 1; font-size: 14px; font-family: var(--font-sans);
+  color: var(--text-primary); background: transparent;
+  border: none; outline: none; padding: 6px 0;
+}
+.input-wrap input::placeholder { color: var(--text-subtle); }
+.input-wrap input:disabled { opacity: 0.4; }
+.btn-ask {
+  padding: 8px 18px; font-size: 13px; font-weight: 500;
+  font-family: var(--font-mono);
+  border-radius: var(--radius-sm);
+  background: var(--accent-green); color: #0A0A0F;
+  transition: opacity var(--transition), transform var(--transition);
+  flex-shrink: 0;
+}
+.btn-ask:hover:not(:disabled) { opacity: 0.85; transform: scale(0.98); }
+.btn-ask:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-ask.htmx-request { opacity: 0.5; cursor: wait; }
+
+.suggested-label {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle); letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 2rem; }
+.chip-q {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 4px 12px; border-radius: var(--radius-pill);
+  background: transparent;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+}
+.chip-q:hover {
+  color: var(--accent-green);
+  border-color: rgba(110,231,183,0.3);
+  background: rgba(110,231,183,0.05);
+}
+
+/* resultado HTMX */
+.result-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden; margin-bottom: 1rem;
+  animation: slideIn 0.25s ease;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.result-header {
+  padding: 10px 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.result-q {
+  font-size: 13px; font-weight: 500;
+  color: var(--text-muted); flex: 1;
+  font-family: var(--font-mono);
+}
+.badge {
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 2px 9px; border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.badge-ok {
+  color: #0A0A0F;
+  background: var(--accent-green);
+  border: 1px solid var(--accent-green);
+}
+.badge-blocked {
+  color: var(--accent-yellow);
+  background: rgba(252,211,77,0.08);
+  border: 1px solid rgba(252,211,77,0.2);
+}
+.result-body { padding: 1.25rem 1.5rem; }
+.result-answer {
+  font-size: 15px; font-weight: 400; color: var(--text-primary);
+  line-height: 1.85; margin-bottom: 1.25rem;
+  border-left: 2px solid rgba(110,231,183,0.25);
+  padding-left: 1rem;
+}
+.result-sources {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle); flex-wrap: wrap;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.source-tag {
+  background: rgba(110,231,183,0.06);
+  border: 1px solid rgba(110,231,183,0.2);
+  padding: 3px 9px; border-radius: var(--radius-pill);
+  color: var(--accent-green);
+  font-size: 11px;
+}
+
+/* loading indicator HTMX */
+#loading {
+  display: none; padding: 1.5rem;
+  text-align: center;
+}
+#loading.htmx-request { display: block; }
+.typing-dots {
+  display: inline-flex; gap: 5px; align-items: center;
+}
+.typing-dots span {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent-green); opacity: 0.4;
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing-dot {
+  0%,60%,100% { opacity: 0.4; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-4px); }
+}
+
+/* exhausted */
+.exhausted {
+  display: none; text-align: center;
+  padding: 2rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+.exhausted p {
+  font-family: var(--font-mono); font-size: 13px;
+  color: var(--text-muted);
+}
+.exhausted a { color: var(--accent-green); }
+
+/* ── FOOTER ── */
+.trace-timeline {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+}
+.trace-step {
+  display: flex; align-items: baseline;
+  gap: 8px; padding: 4px 0;
+  border-bottom: 0.5px solid rgba(30,41,59,0.4);
+}
+.trace-step:last-child,
+.trace-step:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+.trace-label {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-subtle); letter-spacing: 0.06em;
+  text-transform: uppercase; flex-shrink: 0; width: 130px;
+}
+.trace-value {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-muted); flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.trace-ok .trace-value  { color: var(--accent-green); }
+.trace-fail .trace-value { color: var(--accent-red); }
+
+.chunk-preview {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+.chunk-preview summary {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-subtle); cursor: pointer;
+  letter-spacing: 0.05em;
+  list-style: none;
+  display: flex; align-items: center; gap: 6px;
+}
+.chunk-preview summary::before {
+  content: "▶"; font-size: 9px; transition: transform 0.2s;
+}
+.chunk-preview[open] summary::before { transform: rotate(90deg); }
+.chunk-preview summary:hover { color: var(--text-muted); }
+.chunk-content {
+  margin-top: 8px;
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-muted); line-height: 1.6;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 1.5rem 0; margin-top: 4rem;
+}
+.footer__inner {
+  max-width: 1080px; margin: 0 auto; padding: 0 1.5rem;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem;
+}
+.footer__copy {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-subtle);
+}
+.footer__link {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-muted); transition: color var(--transition);
+}
+.footer__link:hover { color: var(--accent-green); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 700px) {
+  .two-col { grid-template-columns: 1fr; }
+  .stack-grid { grid-template-columns: 1fr; }
+  .metrics-row { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav__inner">
+    <a href="https://gaxoblanco.com" class="nav__logo">
+      gaxoblanco<span>_</span>rag
+    </a>
+    <span class="nav__badge">
+      <span class="nav__dot"></span>
+      sistema activo
+    </span>
+  </div>
+</nav>
+
+<main class="main">
+
+  <header class="page-header">
+    <h1><span style="font-weight:400">panel de control</span> <strong style="font-weight:700;font-style:normal;color:var(--accent-green)">RAG</strong></h1>
+    <p>rag.gaxoblanco.com · evaluación {{ eval_data.get('fecha', '—') }} · {{ eval_data.get('total_chunks', 0) }} chunks · {{ eval_data.get('modelo_llm', '—').split('/')[-1] }}</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" role="tab" onclick="switchTab('playground',this)">playground</button>
+    <button class="tab" role="tab" onclick="switchTab('metricas',this)">métricas</button>
+    <button class="tab" role="tab" onclick="switchTab('arquitectura',this)">arquitectura</button>
+    <button class="tab" role="tab" onclick="switchTab('stack',this)">stack</button>
+  </div>
+
+  <!-- ── PLAYGROUND ─────────────────────────────────── -->
+  <section class="pane active" id="pane-playground" role="tabpanel">
+
+    <div class="counter-bar">
+      <span class="counter-label">preguntas disponibles hoy</span>
+      <div class="counter-pills" id="pills" aria-label="preguntas usadas">
+        <div class="pill" id="p1"></div>
+        <div class="pill" id="p2"></div>
+        <div class="pill" id="p3"></div>
+        <div class="pill" id="p4"></div>
+        <div class="pill" id="p5"></div>
+      </div>
+    </div>
+
+    <form id="pg-form"
+          hx-post="/playground"
+          hx-target="#results"
+          hx-swap="afterbegin"
+          hx-indicator="#loading"
+          onsubmit="onSubmit(event)">
+      <div class="input-wrap">
+        <input type="text"
+               name="question"
+               id="q-input"
+               placeholder="preguntale algo al RAG..."
+               maxlength="200"
+               autocomplete="off"
+               aria-label="pregunta" />
+        <button type="submit" class="btn-ask" id="btn-ask">preguntar</button>
+      </div>
+    </form>
+
+    <p class="suggested-label">sugeridas</p>
+    <div class="chips" role="list">
+      <button class="chip-q" role="listitem" onclick="usarSugerida(this)">¿qué hace el WhatsApp Booking Bot?</button>
+      <button class="chip-q" role="listitem" onclick="usarSugerida(this)">¿qué tecnologías usás?</button>
+      <button class="chip-q" role="listitem" onclick="usarSugerida(this)">¿a dónde querés ir profesionalmente?</button>
+      <button class="chip-q" role="listitem" onclick="usarSugerida(this)">¿qué es Lineup?</button>
+      <button class="chip-q" role="listitem" onclick="usarSugerida(this)">¿por qué usaste ChromaDB en el rag_bot?</button>
+      <button class="chip-q" role="listitem" onclick="usarSugerida(this)">¿dónde trabajaste antes?</button>
+    </div>
+
+    <div id="loading" aria-live="polite">
+      <div class="typing-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div id="results" aria-live="polite"></div>
+
+    <div class="exhausted" id="exhausted" role="alert">
+      <p>usaste las 5 preguntas del día —
+        <a href="https://gaxoblanco.com/#contact">contactame por WhatsApp</a>
+        si querés saber más
+      </p>
+    </div>
+
+  </section>
+
+  <!-- ── MÉTRICAS ────────────────────────────────────── -->
+  <section class="pane" id="pane-metricas" role="tabpanel">
+
+    <div class="metrics-row">
+      <div class="metric">
+        <div class="metric__label">chunks</div>
+        <div class="metric__value">{{ eval_data.get('total_chunks', 0) }}</div>
+        <div class="metric__hint">{{ eval_data.get('fuentes')|length if eval_data.get('fuentes') else 0 }} fuentes</div>
+      </div>
+      <div class="metric">
+        <div class="metric__label">faithfulness</div>
+        {% set f = eval_data.get('faithfulness_avg') %}
+        <div class="metric__value {{ 'pass' if f and f >= 0.7 else 'warn' }}">
+          {{ '%.3f'|format(f) if f else '—' }}
+        </div>
+        <div class="metric__hint">threshold 0.70</div>
+      </div>
+      <div class="metric">
+        <div class="metric__label">answer relevancy</div>
+        {% set r = eval_data.get('answer_relevancy_avg') %}
+        <div class="metric__value {{ 'pass' if r and r >= 0.7 else 'warn' }}">
+          {{ '%.3f'|format(r) if r else '—' }}
+        </div>
+        <div class="metric__hint">threshold 0.70</div>
+      </div>
+      <div class="metric">
+        <div class="metric__label">evaluadas</div>
+        <div class="metric__value">{{ eval_data.get('preguntas_evaluadas', 0) }}<span style="font-size:16px;color:var(--text-subtle)">/{{ eval_data.get('preguntas_total', 0) }}</span></div>
+        <div class="metric__hint">golden dataset</div>
+      </div>
+      <div class="metric">
+        <div class="metric__label">modelo</div>
+        <div class="metric__value" style="font-size:14px;padding-top:6px">{{ eval_data.get('modelo_llm', '—').split('/')[-1] if eval_data.get('modelo_llm') else '—' }}</div>
+        <div class="metric__hint">HuggingFace · Novita</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+
+      <div class="card">
+        <div class="card__title">faithfulness por pregunta</div>
+        {% if eval_data.get('por_pregunta') %}
+          {% for p in eval_data.por_pregunta %}
+            {% if p.faithfulness is not none %}
+            <div class="score-row">
+              <span class="score-label">{{ p.id }}</span>
+              <div class="score-bar-wrap">
+                <div class="score-bar {{ 'bar-pass' if p.faithfulness >= 0.7 else 'bar-warn' }}"
+                     style="width:{{ (p.faithfulness * 100)|round|int }}%"></div>
+              </div>
+              <span class="score-val {{ 'pass' if p.faithfulness >= 0.7 else 'warn' }}">
+                {{ '%.2f'|format(p.faithfulness) }}
+              </span>
+            </div>
+            {% endif %}
+          {% endfor %}
+          <p class="score-note">threshold 0.70 · verde = pasa · amarillo = por debajo</p>
+        {% else %}
+          <p style="color:var(--text-subtle);font-size:13px">sin datos — correr test_rag_eval.py</p>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="card__title">knowledge base</div>
+        <ul class="source-list">
+          {% if eval_data.get('fuentes') %}
+            {% for f in eval_data.fuentes %}
+            <li class="source-item">
+              <span class="source-name">{{ f.nombre }}</span>
+              <span class="chunk-n">{{ f.chunks }}</span>
+            </li>
+            {% endfor %}
+          {% else %}
+            <li style="color:var(--text-subtle);font-size:13px">sin datos</li>
+          {% endif %}
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── ARQUITECTURA ───────────────────────────────── -->
+  <section class="pane" id="pane-arquitectura" role="tabpanel">
+    <div class="card">
+      <div class="card__title">flujo de una query</div>
+
+      <div class="arch-step">
+        <div class="arch-icon ai-default"><i class="ti ti-message" aria-hidden="true"></i></div>
+        <div>
+          <div class="arch-name">input</div>
+          <div class="arch-desc">detección de saludo · contacto directo · intent visitante (recruiter / cliente / neutro)</div>
+        </div>
+      </div>
+
+      <div class="arch-step">
+        <div class="arch-icon ai-yellow"><i class="ti ti-shield" aria-hidden="true"></i></div>
+        <div>
+          <div class="arch-name">guardia de entrada</div>
+          <div class="arch-desc">bloquea injection / jailbreak en ES + EN · ~40 keywords · <code>re.search</code> con <code>\b</code> para evitar substring match</div>
+        </div>
+      </div>
+
+      <div class="arch-step">
+        <div class="arch-icon ai-yellow"><i class="ti ti-filter" aria-hidden="true"></i></div>
+        <div>
+          <div class="arch-name">guardia de relevancia</div>
+          <div class="arch-desc">bloquea off-topic sin keywords del perfil · keywords cortas con límite de palabra · permite preguntas ambiguas</div>
+        </div>
+      </div>
+
+      <div class="arch-step">
+        <div class="arch-icon ai-violet"><i class="ti ti-database" aria-hidden="true"></i></div>
+        <div>
+          <div class="arch-name">retrieval — ChromaDB MMR</div>
+          <div class="arch-desc">k=8 · fetch_k=30 · lambda=0.6 · nomic-embed-text via Ollama · contextos proyecto + referencia separados · historial con proyecto_activo</div>
+        </div>
+      </div>
+
+      <div class="arch-step">
+        <div class="arch-icon ai-violet"><i class="ti ti-brand-github" aria-hidden="true"></i></div>
+        <div>
+          <div class="arch-name">conectores externos (condicional)</div>
+          <div class="arch-desc">GitHub GraphQL si pregunta sobre repos · HuggingFace Hub si pregunta sobre modelos · solo si el router activa la fuente</div>
+        </div>
+      </div>
+
+      <div class="arch-step">
+        <div class="arch-icon ai-green"><i class="ti ti-brain" aria-hidden="true"></i></div>
+        <div>
+          <div class="arch-name">LLM — Llama 3.1 8B</div>
+          <div class="arch-desc">HuggingFace Inference API · Novita · ~2s · prompt en primera persona · CTA adaptado por intent del visitante</div>
+        </div>
+      </div>
+
+      <div class="arch-step">
+        <div class="arch-icon ai-yellow"><i class="ti ti-check" aria-hidden="true"></i></div>
+        <div>
+          <div class="arch-name">guardia de salida</div>
+          <div class="arch-desc">valida que la respuesta contenga keywords del perfil · bloquea respuestas fuera de foco · 158 tests unitarios cubren todo el pipeline</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── STACK ──────────────────────────────────────── -->
+  <section class="pane" id="pane-stack" role="tabpanel">
+    <div class="card">
+      <div class="card__title">stack tecnológico</div>
+      <div class="stack-grid">
+        <div>
+          <p class="stack-group__label">api y orquestación</p>
+          <div class="stack-chips">
+            <span class="stack-chip">FastAPI 0.115</span>
+            <span class="stack-chip">LangChain 0.3</span>
+            <span class="stack-chip">Python 3.11</span>
+            <span class="stack-chip">HTMX 1.9</span>
+            <span class="stack-chip">Jinja2 3.1</span>
+            <span class="stack-chip">slowapi</span>
+          </div>
+        </div>
+        <div>
+          <p class="stack-group__label">retrieval</p>
+          <div class="stack-chips">
+            <span class="stack-chip">ChromaDB 0.6.3</span>
+            <span class="stack-chip">nomic-embed-text</span>
+            <span class="stack-chip">Ollama 0.6.8</span>
+            <span class="stack-chip">MMR k=8</span>
+          </div>
+        </div>
+        <div>
+          <p class="stack-group__label">infraestructura</p>
+          <div class="stack-chips">
+            <span class="stack-chip">Docker</span>
+            <span class="stack-chip">Nginx</span>
+            <span class="stack-chip">Let's Encrypt</span>
+            <span class="stack-chip">Donweb VPS</span>
+          </div>
+        </div>
+        <div>
+          <p class="stack-group__label">evaluación</p>
+          <div class="stack-chips">
+            <span class="stack-chip">RAGAS 0.2.15</span>
+            <span class="stack-chip">pytest 8.3</span>
+            <span class="stack-chip">158 tests</span>
+            <span class="stack-chip">golden dataset 11q</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer__inner">
+    <span class="footer__copy">gastón blanco · rag_bot · Mayo 2026</span>
+    <div style="display:flex;gap:1.5rem">
+      <a href="https://gaxoblanco.com" class="footer__link">portfolio</a>
+      <a href="https://github.com/gaxoblanco" class="footer__link">github</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+let used = 0;
+const MAX = 5;
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function updatePills() {
+  for (let i = 1; i <= MAX; i++) {
+    document.getElementById('p' + i).classList.toggle('used', i <= used);
+  }
+}
+
+function usarSugerida(btn) {
+  const input = document.getElementById('q-input');
+  input.value = btn.textContent;
+  input.focus();
+}
+
+function onSubmit(e) {
+  if (used >= MAX) { e.preventDefault(); return; }
+  const input = document.getElementById('q-input');
+  if (!input.value.trim()) { e.preventDefault(); return; }
+
+  used++;
+  updatePills();
+
+  if (used >= MAX) {
+    document.getElementById('btn-ask').disabled = true;
+    input.disabled = true;
+    input.placeholder = 'límite de preguntas alcanzado';
+    document.getElementById('exhausted').style.display = 'block';
+    document.querySelector('.chips').style.display = 'none';
+  }
+}
+
+document.getElementById('q-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('pg-form').dispatchEvent(new Event('submit', {bubbles:true}));
+  }
+});
+
+updatePills();
+</script>
+</body>
+</html>
