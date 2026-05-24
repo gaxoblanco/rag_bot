@@ -265,11 +265,12 @@ def _contexto_chromadb(query: str) -> tuple[str, list[str]]:
     )
 
     if not docs:
-        return "", []
+        return "", [], []
 
-    contexto = "\n\n".join(doc.page_content for doc in docs)
-    fuentes  = list({doc.metadata.get("source", "chromadb") for doc in docs})
-    return contexto, fuentes
+    contexto    = "\n\n".join(doc.page_content for doc in docs)
+    fuentes     = list({doc.metadata.get("source", "chromadb") for doc in docs})
+    chunks_raw  = [doc.page_content for doc in docs]
+    return contexto, fuentes, chunks_raw
 
 
 def _contexto_chromadb_proyecto(proyecto: str) -> str:
@@ -306,6 +307,7 @@ def _construir_contexto(pregunta: str, fuentes: dict) -> tuple[str, str, list[st
     fuentes_usadas  = []
     ctx_proyecto    = ""
     partes_ref      = []
+    chunks_raw      = []
 
     # Enriquecer query si hay proyecto activo en el historial
     # Si la pregunta menciona explícitamente otro proyecto, resetear el activo
@@ -324,11 +326,12 @@ def _construir_contexto(pregunta: str, fuentes: dict) -> tuple[str, str, list[st
         query_enriquecida = pregunta
 
     # ChromaDB — contexto de proyecto (query enriquecida, foco)
-    ctx_chroma, src_chroma = _contexto_chromadb(query_enriquecida)
+    ctx_chroma, src_chroma, raw = _contexto_chromadb(query_enriquecida)
     if ctx_chroma:
         ctx_proyecto = ctx_chroma
         fuentes_usadas.extend(src_chroma)
         fuentes_usadas.append("chromadb")
+        chunks_raw.extend(raw)
 
     # ChromaDB — contexto de referencia (query original, general)
     if proyecto:
@@ -358,11 +361,11 @@ def _construir_contexto(pregunta: str, fuentes: dict) -> tuple[str, str, list[st
             print(f"[rag_chain] HuggingFace no disponible: {e}")
 
     ctx_referencia = "\n\n---\n\n".join(partes_ref)
-    return ctx_proyecto, ctx_referencia, list(set(fuentes_usadas))
+    return ctx_proyecto, ctx_referencia, list(set(fuentes_usadas)), chunks_raw
 
 # ── Función principal ─────────────────────────────────────────────────────────
 
-def responder(pregunta: str) -> dict:
+def responder(pregunta: str, include_contexts: bool = False) -> dict:
     """
     Pipeline RAG completo con memoria conversacional.
 
@@ -384,8 +387,19 @@ def responder(pregunta: str) -> dict:
         }
 
     # 1. Detectar saludo — limpiar historial y responder directo sin LLM
-    _SALUDOS = ["hola", "buenas", "hey", "hi", "hello", "buen día", "buenas tardes", "buenas noches"]
-    es_saludo = any(s in pregunta.lower() for s in _SALUDOS) and len(pregunta.split()) <= 6
+    # Saludos cortos ("hi", "hey") se chequean con \b para evitar substring match.
+    # Ejemplo: "hi" matchea "hiciste" sin el límite de palabra.
+    _SALUDOS_EXACT = ["hola", "buenas", "hello", "buen día", "buenas tardes", "buenas noches"]
+    _SALUDOS_WORD  = ["hi", "hey"]  # requieren límite de palabra
+    import re as _re
+    _texto_lower = pregunta.lower()
+    es_saludo = (
+        (
+            any(s in _texto_lower for s in _SALUDOS_EXACT) or
+            any(_re.search(r"\b" + s + r"\b", _texto_lower) for s in _SALUDOS_WORD)
+        )
+        and len(pregunta.split()) <= 6
+    )
     if es_saludo:
         limpiar_historial()
         print("[historial] Saludo detectado — respuesta directa")
@@ -453,7 +467,7 @@ def responder(pregunta: str) -> dict:
     fuentes = clasificar_fuentes(pregunta)
 
     # 3b. Construir contexto desde todas las fuentes activas
-    ctx_proyecto, ctx_referencia, fuentes_usadas = _construir_contexto(pregunta, fuentes)
+    ctx_proyecto, ctx_referencia, fuentes_usadas, chunks_raw = _construir_contexto(pregunta, fuentes)
 
     if not ctx_proyecto and not ctx_referencia:
         return {
@@ -509,9 +523,10 @@ def responder(pregunta: str) -> dict:
     print(f"[historial] {len(_historial)}/{MAX_HISTORIAL} interacciones guardadas")
 
     return {
-        "answer" : respuesta,
-        "sources": fuentes_usadas,
-        "blocked": False,
+        "answer"  : respuesta,
+        "sources" : fuentes_usadas,
+        "blocked" : False,
+        **({"contexts": chunks_raw} if include_contexts else {}),
     }
 
 
