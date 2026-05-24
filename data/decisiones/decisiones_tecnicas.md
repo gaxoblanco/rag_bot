@@ -92,3 +92,69 @@ sin duplicar lógica. El tono es configuración, no código.
 
 **Resultado:** nuevos clientes se onboardean cambiando variables de entorno,
 sin tocar el sistema central.
+
+---
+
+## ChromaDB en contenedor separado vs embedded en el rag_bot
+
+**Contexto:** sistema RAG personal que necesita persistir una knowledge base vectorial
+entre reinicios de la API.
+
+**Alternativas consideradas:**
+- ChromaDB embedded — corre dentro del mismo proceso de la API
+- ChromaDB en contenedor Docker separado con volumen persistente
+
+**Decisión:** ChromaDB en contenedor separado.
+
+**Razón:** con ChromaDB embedded, los datos vectoriales viven en el mismo ciclo
+de vida que la API — si la API se reinicia o se reconstruye la imagen, se pierde
+la knowledge base. Un contenedor separado con volumen persistente hace que los datos
+sobrevivan independientemente de lo que pase con el contenedor de la API.
+Además permite re-ingestar sin reiniciar el servidor.
+
+**Resultado:** la knowledge base persiste entre deploys. El comando
+`docker compose down` baja los contenedores pero no toca los volúmenes.
+
+---
+
+## HuggingFace Inference API vs Ollama local para LLM en producción en el rag_bot
+
+**Contexto:** el VPS de producción (Donweb, 4GB RAM) no tiene GPU.
+Necesitaba un LLM para generar respuestas en el sistema RAG.
+
+**Alternativas consideradas:**
+- Ollama con llama3.1:8b corriendo en el VPS (CPU)
+- HuggingFace Inference API via Novita como proveedor externo
+
+**Decisión:** HuggingFace Inference API con Llama-3.1-8B-Instruct via Novita.
+
+**Razón:** correr llama3.1:8b en CPU en un VPS de 4GB RAM implica
+tiempos de respuesta de varios minutos por query — inaceptable para producción.
+La API de HuggingFace corre el modelo en sus servidores con GPU,
+devuelve respuesta en ~2 segundos, y no tiene costo fijo.
+Ollama se mantiene en el stack solo para embeddings (nomic-embed-text),
+donde la latencia no es crítica.
+
+**Resultado:** ~2 segundos de respuesta en producción sin GPU local.
+Costo variable por uso, sin infraestructura adicional.
+
+---
+
+## InferenceClient directo vs ChatHuggingFace en el rag_bot
+
+**Contexto:** integrar el LLM de HuggingFace en la chain de LangChain.
+
+**Alternativas consideradas:**
+- `ChatHuggingFace` de langchain-huggingface
+- `InferenceClient` directo de huggingface-hub con clase LLM custom
+
+**Decisión:** `InferenceClient` directo con clase LLM custom.
+
+**Razón:** `ChatHuggingFace` intenta descargar el tokenizador del modelo
+al inicializarse. Llama-3.1-8B-Instruct es un modelo gated — requiere
+aceptar términos en HuggingFace. La descarga del tokenizador falla con 403
+aunque el token tenga acceso a la Inference API.
+`InferenceClient` directo llama solo al endpoint de inferencia
+sin intentar descargar nada localmente.
+
+**Resultado:** inicialización sin errores, llamadas a la API funcionando correctamente.
