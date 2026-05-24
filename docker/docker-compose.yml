@@ -110,6 +110,8 @@ services:
       - ../scripts:/app/scripts
       - ../connectors:/app/connectors
       - ../data:/app/data
+      - ../tests:/app/tests
+      - ../requirements-dev.txt:/app/requirements-dev.txt
     depends_on:
       chroma:
         condition: service_healthy
