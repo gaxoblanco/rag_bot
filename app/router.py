@@ -50,6 +50,11 @@ def validar_input(pregunta: str) -> tuple:
     texto    = pregunta.strip()
     palabras = texto.split()
 
+    # 0. String vacío
+    if not texto:
+        print("[validar_input] Rechazado — pregunta vacía")
+        return False, "vacio"
+
     # 1. Longitud maxima
     if len(texto) > MAX_CHARS:
         print(f"[validar_input] Rechazado — longitud {len(texto)} > {MAX_CHARS}")
@@ -151,23 +156,35 @@ _PERFIL_KEYWORDS = [
     # Rol
     "desarrollador", "developer", "programador", "fullstack",
     "freelance", "disponible", "contratar", "contratas",
-    # Tecnologías del perfil
+    # Tecnologías del perfil — solo las que no son substring de palabras comunes
     "python", "javascript", "typescript", "react", "angular", "docker",
     "spacy", "langchain", "fastapi", "flask", "redis", "pytorch",
-    "huggingface", "chromadb", "ollama", "llm", "rag", "nlp", "ml",
-    "ia", "ai", "inteligencia artificial", "machine learning",
+    "huggingface", "chromadb", "ollama",
+    "inteligencia artificial", "machine learning",
     # Proyectos
-    "bot", "chatbot", "booking", "lineup", "spotify", "festival",
+    "chatbot", "booking", "lineup", "spotify", "festival",
     "visa", "sponsor", "interpretabilidad", "cnn", "neural",
     "whatsapp", "twilio", "github",
     # Perfil / carrera
-    "perfil", "cv", "currículum", "curriculum", "experiencia",
+    "perfil", "currículum", "curriculum", "experiencia",
     "carrera", "proyecto", "producción", "produccion",
     "aprendiste", "estudiaste",
     "objetivos", "orientación", "orientacion",
     # Contacto
     "contactar", "contratar", "agendar", "meet", "reunión", "reunion",
     "precio", "presupuesto", "cuánto", "cuanto",
+]
+
+# Keywords cortas que pueden aparecer como substring de otras palabras.
+# Se chequean con \b (límite de palabra) para evitar falsos positivos.
+# Ejemplos de colisiones sin \b:
+#   "ia"  matchea "noticias", "política", "historia"
+#   "cv"  matchea "activo", "inactivo"
+#   "ml"  matchea "normal", "animal"
+#   "bot" matchea "robótica", "sabotaje"
+_PERFIL_KEYWORDS_WORD = [
+    "ia", "ai", "ml", "llm", "nlp", "rag",
+    "bot", "cv",
 ]
 
 _OFFTOPIC_SEÑALES = [
@@ -182,7 +199,7 @@ _OFFTOPIC_SEÑALES = [
     "receta", "cocina", "comida",
     "película", "pelicula", "serie", "netflix",
     "política", "politica", "economía", "economia",
-    "noticia", "noticias", "news",
+    "noticia", "noticias", "últimas noticias", "ultimas noticias", "news",
 ]
 
 def guardia_relevancia(pregunta: str) -> bool:
@@ -193,11 +210,19 @@ def guardia_relevancia(pregunta: str) -> bool:
     Lógica: si tiene señal off-topic Y ninguna keyword de perfil → bloquear.
     Si tiene cualquier keyword de perfil → siempre dejar pasar.
     Preguntas ambiguas (sin señal de ninguno) → dejar pasar (permisivo).
+
+    Keywords largas: match por substring (in).
+    Keywords cortas: match con \b (límite de palabra) via re.search
+                     para evitar falsos positivos ("ia" en "noticias").
     """
     texto = pregunta.lower()
 
-    # Si tiene cualquier keyword de perfil — siempre válida
+    # Keywords largas — substring match seguro
     if any(kw in texto for kw in _PERFIL_KEYWORDS):
+        return True
+
+    # Keywords cortas — match con límite de palabra
+    if any(re.search(r"\b" + re.escape(kw) + r"\b", texto) for kw in _PERFIL_KEYWORDS_WORD):
         return True
 
     # Si tiene señal clara de off-topic — bloquear
@@ -367,7 +392,7 @@ def guardia_salida(respuesta: str) -> bool:
 # Se usa para personalizar el cierre del prompt con el CTA correcto.
 
 _RECRUITER_KEYWORDS = [
-    "trabajo", "posición", "posicion", "rol", "hiring", "hire",
+    "trabajo", "posición", "posicion", "hiring", "hire",
     "equipo", "team", "contrato", "contract", "disponibilidad", "available",
     "cv", "currículum", "curriculum", "sueldo", "salario", "salary",
     "empresa", "company", "empleado", "employee", "incorporar", "sumar al equipo",
@@ -375,8 +400,13 @@ _RECRUITER_KEYWORDS = [
     "oportunidad laboral", "job", "position", "candidate", "candidato",
 ]
 
+# "rol" matchea como substring en "desarrollar", "desarrollo" → requiere límite de palabra
+_RECRUITER_KEYWORDS_WORD = ["rol"]
+
 _CLIENTE_KEYWORDS = [
     "proyecto", "project", "necesito", "quiero construir", "quiero desarrollar",
+    "necesito desarrollar", "necesito construir", "necesito crear",
+    "necesito un sistema", "necesito una app", "necesito una plataforma",
     "presupuesto", "budget", "cuánto sale", "cuanto sale", "cuánto cuesta",
     "podés hacer", "podes hacer", "can you build", "can you develop",
     "contratar", "hire you", "freelance", "desarrollo a medida",
@@ -394,8 +424,11 @@ def detectar_intent_visitante(pregunta: str) -> str:
     """
     texto = pregunta.lower()
 
-    es_recruiter = any(kw in texto for kw in _RECRUITER_KEYWORDS)
-    es_cliente   = any(kw in texto for kw in _CLIENTE_KEYWORDS)
+    es_recruiter = (
+        any(kw in texto for kw in _RECRUITER_KEYWORDS) or
+        any(re.search(r"\b" + re.escape(kw) + r"\b", texto) for kw in _RECRUITER_KEYWORDS_WORD)
+    )
+    es_cliente = any(kw in texto for kw in _CLIENTE_KEYWORDS)
 
     if es_recruiter and not es_cliente:
         print("[router] Intent visitante: recruiter")
