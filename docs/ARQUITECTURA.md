@@ -2,7 +2,7 @@
 ## Gastón Blanco · gaston_rag
 
 > **Documento vivo.** Se actualiza durante el desarrollo.
-> Última actualización: Fase 6 + deploy producción — Mayo 2026
+> Última actualización: Fase 7 + dashboard + tests — Mayo 2026
 
 ---
 
@@ -15,8 +15,10 @@
 5. [Fuentes de datos](#5-fuentes-de-datos)
 6. [Seguridad](#6-seguridad)
 7. [Infraestructura y deploy](#7-infraestructura-y-deploy)
-8. [Puntos de extensión futura](#8-puntos-de-extension-futura)
-9. [Historial de decisiones](#9-historial-de-decisiones)
+8. [Tests](#8-tests)
+9. [Dashboard](#9-dashboard)
+10. [Puntos de extensión futura](#10-puntos-de-extension-futura)
+11. [Historial de decisiones](#11-historial-de-decisiones)
 
 ---
 
@@ -63,41 +65,49 @@ Guardar en historial conversacional (proyecto_activo detectado)
 Respuesta + CTA según intent del visitante
 ```
 
-**Estado actual:** Fase 6 completada. Deploy en producción — `https://rag.gaxoblanco.com`
+**Estado actual:** Fase 7 completada. Tests nivel 1 (158/158) + evaluación RAG nivel 2 + dashboard público.
 
 ---
 
 ## 2. Responsabilidad de cada archivo
 
-Cada archivo tiene una responsabilidad clara y no se mete en la del otro.
-Cuando algo falla o querés cambiar algo, sabés exactamente dónde ir.
-
 ```
-scripts/ingest.py   — Setup (se corre una vez o cuando cambian los docs)
-                      Lee los .md de data/, los chunkea, los vectoriza
-                      con Ollama y los guarda en ChromaDB.
-                      Ingesta incremental por hash MD5 — solo procesa
-                      archivos nuevos o modificados.
+scripts/ingest.py        — Ingesta incremental por hash MD5.
+                           Lee .md de data/, chunkea, vectoriza con Ollama,
+                           guarda en ChromaDB. Solo procesa archivos modificados.
+                           Al terminar exporta eval_results.json si corresponde.
 
-app/main.py         — Puerta de entrada
-                      Recibe el HTTP request, valida API key,
-                      aplica filtros de input (longitud, repetición,
-                      caracteres) y llama a responder().
+scripts/check_chroma.py  — Utilidad: lista fuentes y chunk counts en ChromaDB.
+                           Útil para verificar ingesta y armar el golden dataset.
 
-app/rag_chain.py    — Cerebro / orquestador
-                      Coordina todo el flujo de una query:
-                      llama al router, construye el contexto,
-                      arma el prompt, llama al LLM,
-                      guarda el historial conversacional.
+app/main.py              — Puerta de entrada + dashboard.
+                           GET  /           → dashboard público (Jinja2 + HTMX)
+                           POST /playground → endpoint público, rate limit 5/día
+                           GET  /health     → status sin auth
+                           POST /ask        → respuesta RAG con X-API-Key
 
-app/router.py       — Especialista en decisiones
-                      Solo toma decisiones, no ejecuta nada.
-                      Responde: ¿es injection? ¿es off-topic?
-                      ¿qué fuentes consultar? ¿recruiter o cliente?
+app/rag_chain.py         — Cerebro / orquestador.
+                           Coordina router → retrieval → prompt → LLM → historial.
+                           responder(pregunta, include_contexts=False) — el flag
+                           include_contexts=True expone los chunks para evaluación
+                           RAGAS (no llega al endpoint productivo).
 
-app/config.py       — Variables de configuración
-                      Centraliza todos los parámetros del sistema.
-                      Un solo lugar para ajustar comportamiento.
+app/router.py            — Especialista en decisiones. Sin I/O, pura lógica.
+                           Responde: ¿injection? ¿off-topic? ¿fuentes? ¿intent?
+                           Keywords cortas con re.search + \b para evitar
+                           substring match (ia, ai, ml, rag, bot, rol, hi, hey).
+
+app/config.py            — Variables de configuración centralizadas.
+
+app/templates/
+└── dashboard.html       — Dashboard público. Jinja2 + HTMX.
+                           Paleta de gaxoblanco.com (DM Sans, DM Mono, dark theme).
+                           Tabs: playground / métricas / arquitectura / stack.
+
+data/
+└── eval_results.json    — Resultados cacheados de la última evaluación RAGAS.
+                           Generado por test_rag_eval.py, leído por el dashboard.
+                           No requiere RAGAS instalado en producción.
 ```
 
 **La regla de dependencias:** `main` llama a `rag_chain`, `rag_chain` llama a `router`.
@@ -112,6 +122,9 @@ Nunca al revés. `router` no sabe que existe `rag_chain`.
 | Lenguaje | Python | 3.11 |
 | API framework | FastAPI | 0.115.12 |
 | ASGI server | Uvicorn | 0.34.0 |
+| Templates | Jinja2 | 3.1.6 |
+| Frontend interactivo | HTMX | 1.9.12 |
+| Form parsing | python-multipart | 0.0.20 |
 | Base vectorial | ChromaDB | 0.6.3 |
 | LangChain core | langchain | 0.3.22 |
 | LangChain Chroma | langchain-chroma | 0.2.2 |
@@ -123,6 +136,17 @@ Nunca al revés. `router` no sabe que existe `rag_chain`.
 | LLM desarrollo | llama3.1:8b via Ollama | — |
 | Rate limiting | slowapi | 0.1.9 |
 | Variables de entorno | python-dotenv | 1.1.0 |
+
+**Dependencias de desarrollo** (solo en `requirements-dev.txt`, no en producción):
+
+| Componente | Tecnología | Versión fija |
+|---|---|---|
+| Testing nivel 1 | pytest | 8.3.5 |
+| Testing async | pytest-asyncio | 0.24.0 |
+| HTTP testing | httpx | 0.27.0 |
+| Evaluación RAG | ragas | 0.2.15 |
+| Datasets RAGAS | datasets | 3.6.0 |
+| LLM juez RAGAS | openai (Ollama compat.) | 1.82.0 |
 
 ---
 
@@ -138,18 +162,24 @@ Historial conversacional con detección de proyecto activo.
 
 ## 5. Fuentes de datos
 
-ChromaDB guarda la narrativa propia (87+ chunks en `data/`).
+ChromaDB guarda la narrativa propia (107 chunks en `data/`).
 GitHub y HuggingFace se consultan en tiempo real.
 
 ```
 data/
-├── decisiones/    — decisiones técnicas del proyecto
-├── experiencia/   — Flextech, That Day in London
-├── orientacion/   — objetivos profesionales
-├── perfil/        — experiencia_y_perfil, preferencias
-├── proyectos/     — Lineup, WhatsApp Booking Bot
-└── stack/         — tecnologías
+├── decisiones/       — decisiones técnicas documentadas por proyecto
+├── experiencia/      — Flextech, That Day in London
+├── orientacion/      — objetivos profesionales
+├── perfil/           — experiencia_y_perfil (con resumen HyDE), preferencias
+├── proyectos/        — Lineup, WhatsApp Booking Bot
+├── stack/            — tecnologías con contexto real de uso
+└── eval_results.json — resultados cacheados de evaluación RAGAS
 ```
+
+**Nota HyDE en `experiencia_y_perfil.md`:** el archivo tiene un párrafo de resumen
+antes del primer `##` con keywords de búsqueda naturales ("contame sobre vos",
+"presentate", etc.). Esto mejora el retrieval para preguntas abiertas de perfil
+sin alterar el contenido narrativo.
 
 → **`docs/FUENTES.md`**
 
@@ -157,9 +187,21 @@ data/
 
 ## 6. Seguridad
 
+**Endpoint `/ask` (chatbot):**
 - `X-API-Key` header con `secrets.compare_digest` — evita timing attacks
 - Rate limit: 20 req/min por IP via slowapi
+
+**Endpoint `/playground` (dashboard público):**
+- Sin API key — público
+- Rate limit: 5 req/día por IP — más restrictivo que `/ask`
+- Mismos filtros de input que `/ask`
+- Sin `include_contexts` — los chunks no se exponen al browser
+- Sin historial conversacional
+
+**Pipeline:**
 - Guardia de entrada: injection/jailbreak en ES + EN
+- Keywords cortas con `re.search + \b` para evitar substring match
+- Guardia de relevancia: off-topic bloqueado
 - Guardia de salida: valida que respuesta sea sobre el perfil
 
 → **`docs/SEGURIDAD.md`**
@@ -182,19 +224,73 @@ Tres contenedores Docker. Ollama solo sirve embeddings en producción.
 
 ---
 
-## 8. Puntos de extensión futura
+## 8. Tests
 
-| Extensión | Estado |
-|---|---|
-| Deploy en Donweb VPS | ✅ Completado — `149.50.128.92` |
-| HTTPS con Let's Encrypt | ✅ Completado — `https://rag.gaxoblanco.com` |
-| Integración landing page | ✅ Completado — `gaxoblanco.com` |
-| Cerrar puerto 8080 con iptables | ✅ Completado — DROP desde exterior, ACCEPT solo 127.0.0.1 |
-| Re-ingesta automática vía webhook | ❌ Descartado — knowledge base local, frecuencia de cambio baja |
+→ **`docs/TESTS.md`** — suite completa nivel 1
+→ **`docs/TESTS_RAG.md`** — evaluación RAG nivel 2
+
+**Resumen:**
+
+| Suite | Archivo | Tests | Estado |
+|---|---|---|---|
+| Router (lógica pura) | `test_router.py` | 55 | ✅ 55/55 |
+| API HTTP | `test_main.py` | 26 | ✅ 26/26 |
+| Pipeline RAG | `test_rag_chain.py` | 49 | ✅ 49/49 |
+| Ingesta incremental | `test_ingest.py` | 28 | ✅ 28/28 |
+| **Nivel 1 total** | | **158** | **✅ 158/158** |
+| Evaluación RAGAS | `test_rag_eval.py` | 11 preguntas | faithfulness 0.709 · answer_relevancy 0.698 |
+
+**Correr tests:**
+```bash
+# Nivel 1 — siempre, rápido
+docker compose -f docker/docker-compose.yml exec api pytest tests/ -v --ignore=tests/test_rag_eval.py --tb=short
+
+# Nivel 2 — manual, cuando cambia el prompt o la knowledge base
+docker compose -f docker/docker-compose.yml exec api pytest tests/test_rag_eval.py::test_resumen_dataset_completo -v -s
+```
+
+**Nota:** `test_rag_eval.py` requiere `requirements-dev.txt` instalado en el contenedor.
+No corre en producción.
 
 ---
 
-## 9. Historial de decisiones
+## 9. Dashboard
+
+Panel de control público en `rag.gaxoblanco.com`.
+Reemplaza la página en blanco con un portfolio técnico interactivo.
+
+→ **`docs/DASHBOARD.md`**
+
+**Tabs:**
+- **playground** — 5 preguntas por sesión via `/playground`, respuestas en tiempo real con HTMX
+- **métricas** — scores RAGAS cacheados, barras por pregunta, chunk counts por fuente
+- **arquitectura** — flujo completo de una query con parámetros reales
+- **stack** — tecnologías con versiones exactas
+
+**Sin RAGAS en producción** — las métricas vienen de `data/eval_results.json`,
+generado en desarrollo por `test_rag_eval.py` y commiteado junto con el código.
+RAGAS implica +2gb extras.
+
+---
+
+## 10. Puntos de extensión futura
+
+| Extensión | Estado |
+|---|---|
+| Deploy en Donweb VPS | ✅ Completado |
+| HTTPS con Let's Encrypt | ✅ Completado |
+| Integración landing page | ✅ Completado |
+| Cerrar puerto 8080 con iptables | ✅ Completado |
+| Tests nivel 1 — 158/158 | ✅ Completado |
+| Evaluación RAG nivel 2 (RAGAS) | ✅ Completado — faithfulness 0.709 |
+| Dashboard público con playground | ✅ Completado |
+| Re-ingesta automática vía webhook | ❌ Descartado — knowledge base local |
+| Context precision reference-free | ⏳ Pendiente — RAGAS 0.2.x no lo soporta sin ground truth |
+| Historial de evaluaciones (gráfico de tendencia) | ⏳ Futuro — requiere persistir múltiples eval_results |
+
+---
+
+## 11. Historial de decisiones
 
 | Fecha | Decisión | Alternativa descartada | Razón |
 |---|---|---|---|
@@ -216,3 +312,9 @@ Tres contenedores Docker. Ollama solo sirve embeddings en producción.
 | Deploy | certbot via snap | certbot apt | Versión apt desactualizada en Ubuntu 24 — conflicto de dependencias |
 | Deploy | torch CPU-only en Dockerfile | torch default | torch default descarga nvidia_cublas (423MB) innecesario en VPS sin GPU |
 | Deploy | guardia_relevancia como capa separada | Ampliar guardia_entrada | Separación de responsabilidades — injection vs off-topic son problemas distintos |
+| Fase 7 | re.search + \b para keywords cortas | keyword in texto | "ia" matcheaba "noticias", "rol" matcheaba "desarrollar", "hi" matcheaba "hiciste" |
+| Fase 7 | requirements-dev.txt separado | pytest + ragas en requirements.txt | RAGAS pesa ~300MB — no va a producción |
+| Fase 7 | eval_results.json cacheado en data/ | RAGAS en producción | RAGAS no se instala en producción — métricas se generan en desarrollo y se commitean |
+| Fase 7 | HTMX para dashboard | React / JS puro | Un solo stack Python — lógica de interacción en el servidor, sin JS propio |
+| Fase 7 | Endpoint /playground separado de /ask | Exponer /ask público | Separa el rate limit y evita exponer la API key del chatbot productivo |
+| Fase 7 | HyDE inverso en experiencia_y_perfil.md | Ajustar retrieval params | Queries de búsqueda en el documento mejoran el retrieval sin tocar el código |
