@@ -1,0 +1,18 @@
+# gaston_rag — dependencias de desarrollo y evaluación
+# NO se instalan en producción — solo en rama feature/rag-eval y entorno local
+# Última revisión: Mayo 2026
+
+# Instalar junto con producción:
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+# ── Testing (nivel 1) ─────────────────────────
+pytest==8.3.5
+pytest-asyncio==0.24.0
+httpx==0.27.0          # requerido por FastAPI TestClient
+
+# ── Evaluación RAG (nivel 2) ──────────────────
+# LLM juez: Ollama via API compatible OpenAI
+# (evita timeouts del wrapper langchain-ollama con RAGAS)
+ragas==0.2.15
+datasets==3.6.0
+openai==1.82.0
