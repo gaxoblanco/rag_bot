@@ -335,7 +335,8 @@ _RESPUESTA_VALIDA_KEYWORDS = [
     # Proyectos y trabajo
     "proyecto", "project", "bot", "sistema", "system",
     "modelo", "model", "entrenamiento", "training",
-    "booking", "lineup", "lollapalooza", "interpretabilidad",
+    "booking", "lineup", "lollapalooza", "interpretabilidad", "viner",
+    "noviembre", "noviembre 2025", "producción desde", "lanzado en",
     # Experiencia y perfil
     "trabajo", "work", "experiencia", "experience",
     "aprendizaje", "learning", "carrera", "career",
