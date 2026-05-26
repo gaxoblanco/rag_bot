@@ -1,6 +1,23 @@
-# WhatsApp Booking Bot — Proyecto en producción
-## Categoría: proyecto_detalle
-## Período: Noviembre 2025 — Presente (en producción con clientes reales)
+# Viner — WhatsApp Booking Bot en producción
+Categoría: proyecto_detalle — Período: Noviembre 2025 — Presente (en producción con clientes reales)
+
+Viner es el sistema de gestión de turnos vía WhatsApp que desarrollé y opero.
+Lanzado en noviembre de 2025. En producción con clientes reales desde noviembre 2025.
+Fecha de lanzamiento: noviembre 2025.
+Gestiona reservas, recordatorios, lista de espera y sincronización con Google Calendar
+para profesionales de salud, psicología, legal, fitness y belleza.
+Stack: Python, Flask, spaCy entrenado (99.2% accuracy), Redis, SQLite, Twilio,
+Google Calendar API, Docker multi-tenant. Sin LLMs — modelo propio de clasificación.
+
+En este portfolio Viner cumple dos roles: es uno de mis proyectos técnicos más
+complejos, y es también la herramienta que uso para que los visitantes agenden
+un meet conmigo directamente por WhatsApp.
+
+Preguntas frecuentes sobre Viner: qué es Viner, cómo funciona el bot,
+por qué no usaste un LLM, cómo está construido, qué tecnologías usa el WhatsApp bot,
+qué es el booking bot, cómo agendo una reunión, cómo me contacto,
+el bot de WhatsApp, viner.gaxoblanco.com, cuándo lanzaste Viner, fecha de lanzamiento,
+desde cuándo está en producción, cuándo empezaste Viner.
 
 ---
 
