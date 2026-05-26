@@ -2,9 +2,12 @@
 ## Categoría: experiencia
 ## Período: Septiembre 2022 — Noviembre 2023
 
-Trabajé en That Day in London como freelance front-end durante 14 meses. Es una mini factory de desarrollo web. Mi rol incluía todas las decisiones de diseño y optimización de carga — sin equipo de diseño, el criterio propio era el único filtro antes de llegar al cliente. Proyectos destacados: sistema de componentes Storybook + Drupal para Bimbo México (atomic design, SASS), plataforma logística con React y React Native compartiendo estado via Redux con OCR para escanear órdenes. Me fui para vivir en Holanda con visa Working Holiday.
-
-Preguntas frecuentes sobre That Day in London: ¿dónde trabajaste? ¿qué experiencia laboral tenés? ¿trabajaste en una empresa? ¿qué hiciste en That Day in London? ¿trabajaste con React? ¿usaste Storybook? ¿tenés experiencia en equipos? ¿cuándo empezaste a programar profesionalmente?
+Trabajé en That Day in London como freelance front-end durante 14 meses (2022-2023).
+Fui responsable de todas las decisiones de diseño y optimización de carga.
+Proyectos destacados: sistema de componentes Storybook + Drupal para Bimbo México
+(atomic design, SASS), plataforma logística React + React Native con Redux y OCR.
+Preguntas frecuentes: qué hiciste en That Day, dónde trabajaste, experiencia laboral,
+That Day in London, Bimbo México, Storybook, React Native, cómo fue tu primer trabajo.
 
 ---
 
@@ -23,8 +26,8 @@ el único filtro antes de que algo llegara al cliente.
 
 ## El contexto: entre trainee y junior
 
-Era un momento temprano en mi carrera como programador.
-El rol funcionó como una transición real entre trainee y junior — con
+Era un momento temprano en la carrera de Gastón como programador.
+El rol me funcionó como una transición real entre trainee y junior — con
 responsabilidades de junior desde el primer día, pero sin haber pasado por
 un período largo de formación previa en entorno profesional.
 
@@ -40,7 +43,7 @@ técnica en los momentos donde el código todavía era un desafío.
 **Encontrar bugs.** En 2022-2023 los modelos LLM aún no eran lo que son hoy —
 debuggear requería más tiempo, más lectura de documentación, más prueba y error.
 Hoy ese proceso cambió radicalmente con la asistencia de LLMs. Lo viví
-de los dos lados: sé lo que era antes y lo que es ahora.
+de los dos lados: sabe lo que era antes y lo que es ahora.
 
 **Configurar el entorno de desarrollo.** XAMPP generaba conflictos constantes
 con otras librerías. Resolver esos conflictos de dependencias de forma manual
@@ -63,7 +66,7 @@ pensado para crecer — no una solución puntual.
 
 El rol en este proyecto fue exclusivamente front-end: Storybook, atomic design,
 SASS y la integración con Drupal. La configuración de Drupal como CMS
-estuvo a cargo del backend — yo no configuré Drupal, me ocupé del sistema
+estuvo a cargo del backend — Gastón no configuró Drupal, se ocupó del sistema
 de componentes que se integraba con él.
 
 Es uno de los trabajos de ese período del que más orgulloso estoy,
@@ -85,12 +88,7 @@ Hubo una primera iteración y luego una segunda con nuevas funcionalidades.
 
 ## Por qué me fui
 
-Surgió la oportunidad de vivir un tiempo en Holanda. Elegí priorizar
-la experiencia de vida sobre continuar en un rol junior — una decisión consciente.
-
-El viaje no fue solo personal: aproveché para asistir a meetups presenciales
-de código y tecnología en Europa, amplié mi red de contactos internacionales,
-y volví con perspectiva nueva sobre cómo se trabaja en tecnología fuera de Argentina.
+Buscaba una experiencia nueva fuera del trabajo. Fue una decisión personal que abrió perspectivas sobre cómo se trabaja en tecnología a nivel internacional.
 
 ---
 
