@@ -4,11 +4,21 @@
 > Hacia dónde va Gastón, qué quiere aprender, qué tipo de trabajo busca.
 > Actualizar cuando cambien los objetivos o intereses.
 
+Soy desarrollador Fullstack con foco en ML/AI aplicada. Tengo proyectos en producción
+con usuarios reales, arquitecturas propias y modelos entrenados desde cero.
+Busco roles donde AI sea el producto central, no una feature. Equipos chicos donde
+las decisiones técnicas importen. Remoto o híbrido en Buenos Aires.
+Cursando Ingeniería en Sistemas en UTN para solidificar fundamentos matemáticos.
+
+Preguntas frecuentes: a dónde querés ir, qué buscás laboralmente, qué querés aprender,
+cuáles son tus objetivos, qué tipo de trabajo te interesa, dónde te ves en el futuro,
+qué te motiva, qué rol buscás, estás estudiando, qué carrera hacés.
+
 ---
 
 ## Dónde estoy parado hoy
 
-Soy desarrollador Fullstack con foco creciente en ML y AI aplicada.
+Desarrollador Fullstack con foco creciente en ML y AI aplicada.
 No me interesa solo usar modelos — me interesa entender cómo funcionan por dentro
 y tomar decisiones técnicas informadas sobre cuándo usarlos y cuándo no.
 
@@ -16,14 +26,17 @@ Tengo proyectos en producción con usuarios reales, arquitecturas propias,
 y modelos entrenados desde cero. Eso me diferencia de alguien que
 wrappea APIs y llama a eso AI engineering.
 
+Construí un sistema RAG completo en producción — pipeline con LangChain,
+ChromaDB, evaluación con RAGAS, 158 tests unitarios y dashboard público.
+Ese proyecto cerró el gap de RAG que tenía en el mapa de aprendizaje.
+
 ---
 
 ## Qué quiero aprender
 
-**RAG y agentes** — es el gap más claro que tengo y el que más me interesa cerrar.
-Sé cómo funcionan los modelos de clasificación, sé cómo integrar LLMs,
-pero quiero construir sistemas RAG reales y agentes que tomen decisiones.
-De hecho, este sistema de RAG personal es el primer paso en esa dirección.
+**Agentes** — el siguiente paso después del RAG. Sistemas que tomen decisiones,
+no solo que recuperen información. Quiero construir agentes reales con LangChain
+y herramientas propias.
 
 **Fine-tuning de LLMs fundacionales** — entrenando spaCy desde cero aprendí
 el ciclo completo de entrenamiento. El siguiente paso es aplicar ese conocimiento
