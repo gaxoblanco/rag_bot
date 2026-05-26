@@ -130,7 +130,37 @@ def _cargar_eval() -> dict:
         return {}
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+def _playground_rate_limit_handler(request: Request, exc):
+    """
+    Handler personalizado para rate limit del playground.
+    Devuelve HTML amable en lugar del JSON generico de slowapi.
+    """
+    if request.url.path == "/playground":
+        return HTMLResponse(
+            content="""
+<div class="result-item" style="border-color: rgba(252,211,77,0.3)">
+  <div class="result-header">
+    <span class="result-q">límite diario alcanzado</span>
+    <span class="badge badge-blocked">429</span>
+  </div>
+  <div class="result-body">
+    <div class="result-answer" style="border-left-color: rgba(252,211,77,0.4)">
+      Usaste las 5 preguntas disponibles por hoy. El límite existe para mantener
+      el sistema gratuito y accesible para todos los visitantes.
+      <br><br>
+      Si querés saber más sobre el sistema o sobre mi perfil,
+      <a href="https://gaxoblanco.com/#contact" style="color:var(--accent-green)">
+        contactame directamente por WhatsApp
+      </a>.
+    </div>
+  </div>
+</div>""",
+            status_code=200,  # HTMX necesita 200 para insertar el HTML
+        )
+    return _rate_limit_exceeded_handler(request, exc)
+
+app.add_exception_handler(RateLimitExceeded, _playground_rate_limit_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -357,4 +387,4 @@ def ask(
         answer  = resultado["answer"],
         sources = resultado["sources"],
         blocked = resultado["blocked"],
-    )   
+    )
