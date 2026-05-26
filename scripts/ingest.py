@@ -7,6 +7,7 @@ y solo re-ingesta los archivos nuevos o modificados.
 Uso:
     python scripts/ingest.py           # ingesta incremental
     python scripts/ingest.py --reset   # borra ChromaDB y re-ingesta todo
+    docker compose -f docker/docker-compose.yml exec api python scripts/ingest.pydocker compose -f docker/docker-compose.yml exec api python scripts/ingest.py
 """
 
 import os
