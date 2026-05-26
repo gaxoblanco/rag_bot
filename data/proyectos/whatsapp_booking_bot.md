@@ -13,6 +13,8 @@ En este portfolio Viner cumple dos roles: es uno de mis proyectos técnicos más
 complejos, y es también la herramienta que uso para que los visitantes agenden
 un meet conmigo directamente por WhatsApp.
 
+Lanzado en noviembre de 2025. Fecha de lanzamiento de Viner: noviembre 2025.
+En producción desde noviembre 2025 con clientes reales.
 Preguntas frecuentes sobre Viner: qué es Viner, cómo funciona el bot,
 por qué no usaste un LLM, cómo está construido, qué tecnologías usa el WhatsApp bot,
 qué es el booking bot, cómo agendo una reunión, cómo me contacto,
