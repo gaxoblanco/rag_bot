@@ -134,11 +134,21 @@ Respondé en el mismo idioma de la pregunta.
 Sé concreto y directo. Mencioná tecnologías y métricas cuando estén disponibles.
 No uses saludos ni cierres como "Hola", "Espero que te sea útil" o similares.
 Si el usuario saluda, respondé con una sola oración breve y esperá la pregunta.
+
+Largo de respuesta según el tipo de pregunta:
+- Preguntas factuales ("¿usás Docker?", "¿qué lenguajes sabés?") → 1-2 oraciones densas.
+- Preguntas narrativas ("contame sobre vos", "qué hiciste en X", "cómo funciona esto") →
+  2-4 oraciones con contexto real: qué hiciste, cómo lo hiciste, qué resultado tuvo.
+  No cortes la historia antes de que tenga sentido completo.
+- Preguntas de orientación ("a dónde querés ir", "qué querés aprender") →
+  2-3 oraciones con dirección concreta y razón.
+
 Si el historial ya contiene una respuesta sobre un tema y la nueva pregunta pide más
 sobre lo mismo pero no hay más información en el contexto, no repitas la respuesta anterior.
 En cambio, pivoteá hacia algo relacionado que sí tengas en el contexto.
 Ejemplo: si ya contaste todo sobre Flextech y te piden más, podés mencionar que fue
 un proyecto más directo comparado con otros, y ofrecer contar sobre uno más complejo.
+
 Nunca uses frases que anuncien lo que vas a decir antes de decirlo.
 Prohibido: "Me gustaría destacar...", "Lo que me gustaría contarte...",
 "Voy a explicarte...", "En cuanto a tu pregunta...", "Me gustaría comenzar...",
@@ -148,11 +158,9 @@ Mal: "Mi experiencia es variada, pero lo que me gustaría destacar es Flextech."
 Mal: "Me alegra hablar sobre mi experiencia."
 Mal: "Con gusto te cuento sobre mis proyectos."
 Mal: "Claro, puedo contarte sobre..."
-Bien: "En Flextech desarrollé una landing page completa como freelance — diseño en Figma, HTML, CSS, JavaScript y PHP, de punta a punta sin equipo."
-Bien: "Empecé a programar en 2020 via Argentina Programa. El primer trabajo fue en That Day in London."
+Bien: "En Flextech desarrollé una landing page completa como freelance — diseño en Figma, HTML, CSS, JavaScript y PHP, de punta a punta sin equipo. Fue mi primer proyecto gestionado de punta a punta solo."
+Bien: "Empecé a programar en 2020 via Argentina Programa. El primer trabajo fue en That Day in London, donde fui responsable de front-end y diseño durante 14 meses."
 No uses listas numeradas ni viñetas salvo que la pregunta lo requiera explícitamente.
-Respondé en el mínimo de párrafos necesarios — si una idea se puede decir en una
-oración, no la expandas. Priorizá densidad de información sobre extensión.
 Si te preguntan qué preferís entre dos tecnologías, respondé con cuál usaste
 y por qué, basándote solo en lo que dice el contexto. No expreses preferencias abstractas.
 Cuando alguien muestre intención de contratar o trabajar juntos pero no haga una pregunta
@@ -344,9 +352,21 @@ def _construir_contexto(pregunta: str, fuentes: dict) -> tuple[str, str, list[st
         from app.router import detectar_proyecto as _detectar
         proyecto_en_pregunta = _detectar(pregunta)
         if proyecto_en_pregunta and proyecto_en_pregunta != proyecto:
-            # La pregunta habla de otro proyecto — no enriquecer con el anterior
             print(f"[historial] Cambio de proyecto detectado: '{proyecto}' → '{proyecto_en_pregunta}'")
             proyecto = None
+
+    # Sin historial y con deixis ambigua ("este sistema", "esta página", "esto") →
+    # asumir rag_bot: el visitante está en rag.gaxoblanco.com y habla de lo que ve.
+    # Con historial y sin proyecto claro → pedir clarificación via prompt.
+    if not proyecto and not _historial:
+        _DEIXIS = ["este sistema", "esta página", "esta pagina", "este proyecto",
+                   "esto", "acá", "aca", "aquí", "aqui", "esta herramienta",
+                   "este chat", "este bot", "cómo funciona esto", "como funciona esto"]
+        texto_lower = pregunta.lower()
+        if any(d in texto_lower for d in _DEIXIS):
+            proyecto = "rag_bot"
+            print(f"[historial] Deixis sin historial — asumiendo proyecto: 'rag_bot'")
+
     if proyecto:
         query_enriquecida = f"{pregunta} {proyecto.replace('_', ' ')}"
         print(f"[historial] Query enriquecida con proyecto: '{proyecto}'")
