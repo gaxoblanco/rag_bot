@@ -809,6 +809,8 @@ button { border: none; background: none; font: inherit; color: inherit; cursor: 
 <script>
 let used = 0;
 const MAX = 5;
+// Clave con fecha — el contador se resetea automáticamente cada día
+const STORAGE_KEY = 'rag_used_' + new Date().toISOString().slice(0, 10);
 
 function switchTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -823,7 +825,18 @@ function updatePills() {
   }
 }
 
+function _aplicarLimite() {
+  document.getElementById('btn-ask').disabled = true;
+  const input = document.getElementById('q-input');
+  input.disabled = true;
+  input.placeholder = 'límite de preguntas alcanzado';
+  document.getElementById('exhausted').style.display = 'block';
+  const chips = document.querySelector('.chips');
+  if (chips) chips.style.display = 'none';
+}
+
 function usarSugerida(btn) {
+  if (used >= MAX) return;
   const input = document.getElementById('q-input');
   input.value = btn.textContent;
   input.focus();
@@ -835,23 +848,26 @@ function onSubmit(e) {
   if (!input.value.trim()) { e.preventDefault(); return; }
 
   used++;
+  try { localStorage.setItem(STORAGE_KEY, used); } catch(e) {}
   updatePills();
-
-  if (used >= MAX) {
-    document.getElementById('btn-ask').disabled = true;
-    input.disabled = true;
-    input.placeholder = 'límite de preguntas alcanzado';
-    document.getElementById('exhausted').style.display = 'block';
-    document.querySelector('.chips').style.display = 'none';
-  }
+  if (used >= MAX) { _aplicarLimite(); }
 }
 
 document.getElementById('q-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     e.preventDefault();
-    document.getElementById('pg-form').dispatchEvent(new Event('submit', {bubbles:true}));
+    document.getElementById('pg-form').dispatchEvent(new Event('submit', {bubbles: true}));
   }
 });
+
+// Restaurar contador del día desde localStorage al cargar
+try {
+  const saved = parseInt(localStorage.getItem(STORAGE_KEY) || '0');
+  if (saved > 0) {
+    used = Math.min(saved, MAX);
+    if (used >= MAX) { _aplicarLimite(); }
+  }
+} catch(e) {}
 
 updatePills();
 </script>
