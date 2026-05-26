@@ -159,7 +159,7 @@ _PERFIL_KEYWORDS = [
     # Tecnologías del perfil — solo las que no son substring de palabras comunes
     "python", "javascript", "typescript", "react", "angular", "docker",
     "spacy", "langchain", "fastapi", "flask", "redis", "pytorch",
-    "huggingface", "chromadb", "ollama",
+    "huggingface", "chromadb", "ollama", "rag", "nlp", "ml", "llm",
     "inteligencia artificial", "machine learning",
     # Proyectos
     "chatbot", "booking", "lineup", "spotify", "festival",
@@ -274,6 +274,7 @@ _PROYECTOS_KEYWORDS = {
     "register_sponsor"     : ["register", "sponsor", "visa", "holanda", "neerlandés", "linkedin", "patrocinador"],
     "flextech"             : ["flextech", "freelance", "landing"],
     "interpretabilidad_ia" : ["interpretabilidad", "interpretability", "cnn", "deepdream", "neural", "activación"],
+    "rag_bot"              : ["rag bot", "rag_bot", "ragas", "chromadb", "nomic", "playground", "knowledge base", "rag.gaxoblanco"],
 }
 
 def detectar_proyecto(texto: str) -> str | None:
@@ -349,6 +350,8 @@ _RESPUESTA_VALIDA_KEYWORDS = [
     "holanda", "holand", "visa", "working holiday",
     "diseño industrial", "ort", "argentina programa",
     "codo a codo", "solidworks", "blender",
+    # Orientación
+    "rag", "agentes", "agents", "utn", "ingeniería",
 ]
 
 _BUENOS_MODALES = [
