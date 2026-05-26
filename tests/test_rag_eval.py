@@ -87,9 +87,10 @@ def _get_evaluator_embeddings():
 
 # ── Golden dataset ─────────────────────────────────────────────────────────────
 # Fuentes verificadas contra ChromaDB — Mayo 2026:
-#   decisiones_tecnicas (12), experiencia_y_perfil (8), flextech (3),
+#   decisiones_tecnicas (15), experiencia_y_perfil (9), flextech (4),
 #   lineup (11), objetivos_profesionales (10), preferencias (10),
-#   tecnologias (21), that_day_london (13), whatsapp_booking_bot (19)
+#   tecnologias (22), that_day_london (14), whatsapp_booking_bot (24),
+#   rag_bot (24), sobre_este_sistema (8)
 
 GOLDEN_DATASET = [
     # Proyectos tecnicos
@@ -152,6 +153,22 @@ GOLDEN_DATASET = [
         "id": "decisiones_arquitectura",
         "pregunta": "¿por qué usaste ChromaDB en contenedor separado en el rag_bot?",
         "chunks_esperados": ["decisiones_tecnicas"],
+    },
+    # RAG bot — casos nuevos
+    {
+        "id": "rag_bot_descripcion",
+        "pregunta": "de qué trata esta página",
+        "chunks_esperados": ["sobre_este_sistema", "rag_bot"],
+    },
+    {
+        "id": "rag_bot_construccion",
+        "pregunta": "cómo hiciste el rag bot",
+        "chunks_esperados": ["rag_bot", "decisiones_tecnicas"],
+    },
+    {
+        "id": "viner_descripcion",
+        "pregunta": "qué es Viner",
+        "chunks_esperados": ["whatsapp_booking_bot"],
     },
 ]
 
