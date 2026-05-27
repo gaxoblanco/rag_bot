@@ -1,0 +1,129 @@
+{
+  "fecha": "2026-05-25",
+  "faithfulness_avg": 0.508,
+  "answer_relevancy_avg": 0.673,
+  "total_chunks": 167,
+  "preguntas_evaluadas": 14,
+  "preguntas_total": 14,
+  "modelo_llm": "meta-llama/Llama-3.1-8B-Instruct",
+  "modelo_embeddings": "nomic-embed-text",
+  "retrieval_k": 8,
+  "por_pregunta": [
+    {
+      "id": "whatsapp_descripcion",
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.994
+    },
+    {
+      "id": "whatsapp_stack",
+      "faithfulness": 0.429,
+      "answer_relevancy": 0.684
+    },
+    {
+      "id": "lineup_descripcion",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.607
+    },
+    {
+      "id": "lineup_spotify",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.858
+    },
+    {
+      "id": "stack_general",
+      "faithfulness": 0.25,
+      "answer_relevancy": 0.611
+    },
+    {
+      "id": "stack_docker",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.984
+    },
+    {
+      "id": "experiencia_general",
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.64
+    },
+    {
+      "id": "experiencia_flextech",
+      "faithfulness": 0.25,
+      "answer_relevancy": 0.585
+    },
+    {
+      "id": "orientacion_futuro",
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.419
+    },
+    {
+      "id": "perfil_general",
+      "faithfulness": 0.25,
+      "answer_relevancy": 0.533
+    },
+    {
+      "id": "decisiones_arquitectura",
+      "faithfulness": 0.333,
+      "answer_relevancy": 0.703
+    },
+    {
+      "id": "rag_bot_descripcion",
+      "faithfulness": 0.2,
+      "answer_relevancy": 0.511
+    },
+    {
+      "id": "rag_bot_construccion",
+      "faithfulness": 0.6,
+      "answer_relevancy": 0.776
+    },
+    {
+      "id": "viner_descripcion",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.51
+    }
+  ],
+  "fuentes": [
+    {
+      "nombre": "tecnologias",
+      "chunks": 26
+    },
+    {
+      "nombre": "rag_bot",
+      "chunks": 26
+    },
+    {
+      "nombre": "whatsapp_booking_bot",
+      "chunks": 22
+    },
+    {
+      "nombre": "decisiones_tecnicas",
+      "chunks": 20
+    },
+    {
+      "nombre": "that_day_london",
+      "chunks": 17
+    },
+    {
+      "nombre": "lineup",
+      "chunks": 11
+    },
+    {
+      "nombre": "objetivos_profesionales",
+      "chunks": 10
+    },
+    {
+      "nombre": "preferencias",
+      "chunks": 10
+    },
+    {
+      "nombre": "experiencia_y_perfil",
+      "chunks": 10
+    },
+    {
+      "nombre": "sobre_este_sistema",
+      "chunks": 9
+    },
+    {
+      "nombre": "flextech",
+      "chunks": 6
+    }
+  ]
+}
